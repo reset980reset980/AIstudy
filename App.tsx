@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import UploadView from './components/UploadView';
@@ -7,7 +8,7 @@ import HistoryView from './components/HistoryView';
 import QuizView from './components/QuizView';
 import { analyzeMathProblem, validateApiKey } from './services/geminiService';
 import { AnalysisState, ProblemAnalysis, ProblemHistoryItem } from './types';
-import { CircleAlert, Home, History, GraduationCap, LogIn, LogOut, User, X, Mail, Lock, Settings, Moon, Sun, Check, Loader2, KeyRound } from 'lucide-react';
+import { CircleAlert, Home, History, GraduationCap, LogIn, LogOut, User, X, Mail, Lock, Settings, Moon, Sun, Check, Loader2, KeyRound, BrainCircuit, ScanLine, Sparkles } from 'lucide-react';
 import { auth, googleProvider, db } from './firebase';
 import { 
   signInWithPopup, 
@@ -497,7 +498,64 @@ const App: React.FC = () => {
   // Determine main content
   let homeContent: React.ReactNode;
   
-  if (state.isLoading) {
+  if (!user) {
+    // Welcome View for non-logged-in users
+    homeContent = (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] text-center p-4 animate-fade-in pb-10">
+        <div className="mb-8 relative group cursor-pointer" onClick={() => setShowLoginModal(true)}>
+          <div className="absolute inset-0 bg-blue-500 blur-3xl opacity-20 rounded-full group-hover:opacity-30 transition-opacity"></div>
+          <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-700 relative z-10 group-hover:scale-105 transition-transform">
+             <BrainCircuit size={80} className="text-blue-600 dark:text-blue-400" />
+          </div>
+        </div>
+        
+        <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 dark:text-white mb-6 tracking-tight leading-tight">
+          스마트 스터디 <span className="text-blue-600 dark:text-blue-400">AI</span>
+        </h1>
+        
+        <p className="text-lg text-slate-600 dark:text-slate-300 mb-10 max-w-lg leading-relaxed font-medium">
+          혼자 공부하기 힘드신가요?<br />
+          AI 선생님이 <span className="text-blue-600 dark:text-blue-400 font-bold">단계별 풀이</span>부터 <span className="text-purple-600 dark:text-purple-400 font-bold">유사 문제</span>까지<br/>
+          완벽하게 도와드립니다.
+        </p>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12 w-full max-w-4xl text-left">
+           <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+              <div className="w-10 h-10 bg-blue-50 dark:bg-blue-900/30 rounded-full flex items-center justify-center mb-3">
+                 <ScanLine size={20} className="text-blue-600 dark:text-blue-400"/>
+              </div>
+              <h3 className="font-bold text-slate-800 dark:text-white mb-1">1초 만에 스캔</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400">문제집 사진을 찍거나 파일을 업로드하세요.</p>
+           </div>
+           <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+              <div className="w-10 h-10 bg-purple-50 dark:bg-purple-900/30 rounded-full flex items-center justify-center mb-3">
+                 <BrainCircuit size={20} className="text-purple-600 dark:text-purple-400"/>
+              </div>
+              <h3 className="font-bold text-slate-800 dark:text-white mb-1">AI 심층 분석</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400">수식과 개념을 분석해 상세한 풀이를 제공해요.</p>
+           </div>
+           <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+              <div className="w-10 h-10 bg-green-50 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-3">
+                 <Sparkles size={20} className="text-green-600 dark:text-green-400"/>
+              </div>
+              <h3 className="font-bold text-slate-800 dark:text-white mb-1">완벽한 복습</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400">자동으로 생성된 유사 문제로 실력을 다지세요.</p>
+           </div>
+        </div>
+
+        <button
+          onClick={() => setShowLoginModal(true)}
+          className="px-10 py-4 bg-blue-600 text-white text-lg rounded-full font-bold shadow-xl shadow-blue-300 dark:shadow-blue-900/20 hover:bg-blue-700 hover:scale-105 transition-all flex items-center gap-2 animate-bounce-subtle"
+        >
+          <LogIn size={20} />
+          로그인하고 시작하기
+        </button>
+        <p className="mt-4 text-sm text-slate-400 dark:text-slate-500">
+           구글 계정으로 3초 만에 시작할 수 있어요.
+        </p>
+      </div>
+    );
+  } else if (state.isLoading) {
     homeContent = <UploadView onFileSelect={() => {}} isLoading={true} />;
   } else if (rawImageUrl) {
     homeContent = (
