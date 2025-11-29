@@ -1,0 +1,7 @@
+{
+  "name": "MathMate AI(Vercel배포용)",
+  "description": "An AI-powered wrong-answer notebook and personalized math learning system that breaks down problems step-by-step.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
