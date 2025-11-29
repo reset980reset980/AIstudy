@@ -5,9 +5,9 @@ import AnalysisView from './components/AnalysisView';
 import ProblemSelector from './components/ProblemSelector';
 import HistoryView from './components/HistoryView';
 import QuizView from './components/QuizView';
-import { analyzeMathProblem } from './services/geminiService';
+import { analyzeMathProblem, validateApiKey } from './services/geminiService';
 import { AnalysisState, ProblemAnalysis, ProblemHistoryItem } from './types';
-import { CircleAlert, Home, History, GraduationCap, LogIn, LogOut, User, X, Mail, Lock } from 'lucide-react';
+import { CircleAlert, Home, History, GraduationCap, LogIn, LogOut, User, X, Mail, Lock, Settings, Moon, Sun, Check, Loader2, KeyRound } from 'lucide-react';
 import { auth, googleProvider, db } from './firebase';
 import { 
   signInWithPopup, 
@@ -17,7 +17,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword
 } from 'firebase/auth';
-import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, doc, setDoc, getDoc } from 'firebase/firestore';
 
 // --- Login Modal Component ---
 interface LoginModalProps {
@@ -62,27 +62,27 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose, onGoogleLogin }) => {
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in" onClick={onClose}>
-      <div className="bg-white rounded-2xl w-full max-w-sm p-8 shadow-2xl m-4 relative" onClick={e => e.stopPropagation()}>
+      <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-sm p-8 shadow-2xl m-4 relative" onClick={e => e.stopPropagation()}>
         <button 
             onClick={onClose} 
-            className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"
+            className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
         >
             <X size={24} />
         </button>
 
-        <h2 className="text-2xl font-bold text-slate-800 mb-6 text-center">
+        <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-6 text-center">
             {isSignUp ? '회원가입' : '로그인'}
         </h2>
         
         <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1">
-                <label className="block text-sm font-bold text-slate-700">Email</label>
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">Email</label>
                 <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input 
                         type="email" 
                         placeholder="example@email.com"
-                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 bg-slate-50 transition-all"
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 bg-slate-50 dark:bg-slate-700 dark:text-white transition-all"
                         value={email}
                         onChange={e => setEmail(e.target.value)}
                         required
@@ -90,13 +90,13 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose, onGoogleLogin }) => {
                 </div>
             </div>
             <div className="space-y-1">
-                <label className="block text-sm font-bold text-slate-700">Password</label>
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">Password</label>
                 <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input 
                         type="password" 
                         placeholder="******"
-                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 bg-slate-50 transition-all"
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 bg-slate-50 dark:bg-slate-700 dark:text-white transition-all"
                         value={password}
                         onChange={e => setPassword(e.target.value)}
                         required
@@ -104,12 +104,12 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose, onGoogleLogin }) => {
                 </div>
             </div>
 
-            {error && <p className="text-red-500 text-sm font-medium text-center bg-red-50 p-2 rounded-lg">{error}</p>}
+            {error && <p className="text-red-500 text-sm font-medium text-center bg-red-50 dark:bg-red-900/20 p-2 rounded-lg">{error}</p>}
 
             <button 
                 type="submit" 
                 disabled={isLoading}
-                className="w-full py-3.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors disabled:bg-slate-300 shadow-lg shadow-blue-200 mt-2"
+                className="w-full py-3.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors disabled:bg-slate-300 dark:disabled:bg-slate-600 shadow-lg shadow-blue-200 dark:shadow-none mt-2"
             >
                 {isLoading ? '처리 중...' : (isSignUp ? '가입하기' : '로그인')}
             </button>
@@ -118,21 +118,21 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose, onGoogleLogin }) => {
         <div className="mt-4 text-center">
             <button 
                 onClick={() => { setIsSignUp(!isSignUp); setError(null); }}
-                className="text-sm text-slate-500 hover:text-blue-600 font-medium transition-colors"
+                className="text-sm text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors"
             >
                 {isSignUp ? '이미 계정이 있으신가요? 로그인' : '계정이 없으신가요? 회원가입'}
             </button>
         </div>
 
         <div className="my-6 flex items-center gap-2">
-            <div className="h-px bg-slate-200 flex-1"></div>
-            <span className="text-slate-400 text-xs font-bold">OR</span>
-            <div className="h-px bg-slate-200 flex-1"></div>
+            <div className="h-px bg-slate-200 dark:bg-slate-600 flex-1"></div>
+            <span className="text-slate-400 dark:text-slate-500 text-xs font-bold">OR</span>
+            <div className="h-px bg-slate-200 dark:bg-slate-600 flex-1"></div>
         </div>
 
         <button 
             onClick={onGoogleLogin}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 rounded-xl text-slate-700 font-bold hover:bg-slate-50 transition-colors"
+            className="w-full flex items-center justify-center gap-2 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-700 dark:text-white font-bold hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
         >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -147,10 +147,131 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose, onGoogleLogin }) => {
   );
 };
 
+// --- Settings Modal Component ---
+interface SettingsModalProps {
+  onClose: () => void;
+  userId: string;
+  initialApiKey: string;
+  initialTheme: 'light' | 'dark';
+  onSave: (apiKey: string, theme: 'light' | 'dark') => Promise<void>;
+}
+
+const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, userId, initialApiKey, initialTheme, onSave }) => {
+  const [apiKey, setApiKey] = useState(initialApiKey);
+  const [theme, setTheme] = useState<'light' | 'dark'>(initialTheme);
+  const [isTesting, setIsTesting] = useState(false);
+  const [testStatus, setTestStatus] = useState<'idle' | 'success' | 'fail'>('idle');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleTestKey = async () => {
+    if (!apiKey) return;
+    setIsTesting(true);
+    setTestStatus('idle');
+    const isValid = await validateApiKey(apiKey);
+    setIsTesting(false);
+    setTestStatus(isValid ? 'success' : 'fail');
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    await onSave(apiKey, theme);
+    setIsSaving(false);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+      <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl m-4 relative" onClick={e => e.stopPropagation()}>
+        <button 
+            onClick={onClose} 
+            className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+        >
+            <X size={24} />
+        </button>
+
+        <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
+            <Settings size={24} /> 설정
+        </h2>
+
+        <div className="space-y-6">
+            {/* Theme Toggle */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                        {theme === 'light' ? <Sun size={20}/> : <Moon size={20}/>}
+                    </div>
+                    <div>
+                        <p className="font-bold text-slate-700 dark:text-slate-200">다크 모드</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">화면을 어둡게 설정합니다.</p>
+                    </div>
+                </div>
+                <button 
+                    onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${theme === 'dark' ? 'bg-blue-600' : 'bg-slate-300'}`}
+                >
+                    <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${theme === 'dark' ? 'translate-x-6' : 'translate-x-0'}`} />
+                </button>
+            </div>
+
+            {/* API Key Input */}
+            <div className="border-t border-slate-100 dark:border-slate-700 pt-6">
+                <div className="flex items-center gap-2 mb-2">
+                    <KeyRound size={18} className="text-blue-500" />
+                    <label className="text-sm font-bold text-slate-700 dark:text-slate-200">Gemini API 키</label>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                    개인 Google AI Studio 키를 사용하면 더 많은 요청을 처리할 수 있습니다.
+                </p>
+                <div className="relative">
+                    <input 
+                        type="password" 
+                        placeholder="API 키 입력 (AIza...)"
+                        className={`w-full pl-4 pr-24 py-3 rounded-xl border focus:outline-none focus:ring-2 bg-slate-50 dark:bg-slate-700 dark:text-white transition-all
+                            ${testStatus === 'success' ? 'border-green-500 focus:border-green-500 focus:ring-green-100' : 
+                              testStatus === 'fail' ? 'border-red-500 focus:border-red-500 focus:ring-red-100' : 
+                              'border-slate-200 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-100 dark:focus:ring-blue-900'}
+                        `}
+                        value={apiKey}
+                        onChange={e => { setApiKey(e.target.value); setTestStatus('idle'); }}
+                    />
+                    <button 
+                        onClick={handleTestKey}
+                        disabled={isTesting || !apiKey}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 text-xs font-bold bg-white dark:bg-slate-600 border border-slate-200 dark:border-slate-500 rounded-lg text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-500 transition-colors disabled:opacity-50"
+                    >
+                        {isTesting ? <Loader2 size={14} className="animate-spin"/> : '테스트'}
+                    </button>
+                </div>
+                {testStatus === 'success' && <p className="text-xs text-green-600 mt-2 flex items-center gap-1"><Check size={12}/> 유효한 키입니다.</p>}
+                {testStatus === 'fail' && <p className="text-xs text-red-500 mt-2 flex items-center gap-1"><CircleAlert size={12}/> 키가 올바르지 않습니다.</p>}
+            </div>
+        </div>
+
+        <div className="mt-8 pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3">
+            <button 
+                onClick={onClose}
+                className="px-4 py-2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 font-medium text-sm transition-colors"
+            >
+                취소
+            </button>
+            <button 
+                onClick={handleSave}
+                disabled={isSaving}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200 dark:shadow-none disabled:bg-slate-400"
+            >
+                {isSaving ? '저장 중...' : '설정 저장'}
+            </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const App: React.FC = () => {
   // --- Auth State ---
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   // --- App View State ---
   const [currentTab, setCurrentTab] = useState<'HOME' | 'HISTORY' | 'QUIZ'>('HOME');
@@ -167,15 +288,44 @@ const App: React.FC = () => {
   const [finalImageUrl, setFinalImageUrl] = useState<string | null>(null);
   const [historyItems, setHistoryItems] = useState<ProblemHistoryItem[]>([]);
 
-  // --- Auth & Data Loading Effects ---
+  // --- Settings State ---
+  const [userApiKey, setUserApiKey] = useState<string>('');
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+
+  // --- Effects ---
+  
+  // Theme management
+  useEffect(() => {
+    if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+    } else {
+        document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
+
+  // Auth & Data Loading
   useEffect(() => {
     if (!auth) return;
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser && db) {
+        // Fetch User Settings
+        try {
+            const userDoc = await getDoc(doc(db, "users", currentUser.uid, "settings", "config"));
+            if (userDoc.exists()) {
+                const data = userDoc.data();
+                if (data.apiKey) setUserApiKey(data.apiKey);
+                if (data.theme) setTheme(data.theme);
+            }
+        } catch (e) {
+            console.error("Failed to load user settings", e);
+        }
+
         fetchHistory(currentUser.uid);
       } else {
         setHistoryItems([]);
+        setUserApiKey('');
+        setTheme('light'); // Reset to light on logout
       }
     });
     return () => unsubscribe();
@@ -200,6 +350,22 @@ const App: React.FC = () => {
       setHistoryItems(items);
     } catch (error) {
       console.error("Error fetching history:", error);
+    }
+  };
+
+  const saveSettings = async (apiKey: string, newTheme: 'light' | 'dark') => {
+    if (!user || !db) return;
+    try {
+        await setDoc(doc(db, "users", user.uid, "settings", "config"), {
+            apiKey: apiKey,
+            theme: newTheme,
+            updatedAt: Date.now()
+        });
+        setUserApiKey(apiKey);
+        setTheme(newTheme);
+    } catch (e) {
+        console.error("Failed to save settings", e);
+        alert("설정을 저장하는 중 오류가 발생했습니다.");
     }
   };
 
@@ -265,7 +431,7 @@ const App: React.FC = () => {
         setRawImageUrl(null);
         
         try {
-            const data = await analyzeMathProblem(file);
+            const data = await analyzeMathProblem(file, userApiKey); // Pass user API key
             setFinalImageUrl(null); 
             setState({ isLoading: false, data, error: null });
             if (user) saveToHistory(data); // Auto-save
@@ -287,7 +453,7 @@ const App: React.FC = () => {
     setState({ isLoading: true, data: null, error: null });
 
     try {
-      const data = await analyzeMathProblem(croppedFile);
+      const data = await analyzeMathProblem(croppedFile, userApiKey); // Pass user API key
       setState({ isLoading: false, data, error: null });
       if (user) saveToHistory(data); // Auto-save
     } catch (error) {
@@ -354,7 +520,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#FDFBF7] text-slate-800 selection:bg-blue-100 flex flex-col">
+    <div className="min-h-screen bg-[#FDFBF7] dark:bg-slate-900 text-slate-800 dark:text-slate-100 selection:bg-blue-100 dark:selection:bg-blue-900 flex flex-col transition-colors duration-300">
       {/* Login Modal */}
       {showLoginModal && (
         <LoginModal 
@@ -363,29 +529,47 @@ const App: React.FC = () => {
         />
       )}
 
+      {/* Settings Modal */}
+      {showSettingsModal && user && (
+          <SettingsModal 
+            onClose={() => setShowSettingsModal(false)}
+            userId={user.uid}
+            initialApiKey={userApiKey}
+            initialTheme={theme}
+            onSave={saveSettings}
+          />
+      )}
+
       {/* Header */}
-      <header className="fixed top-0 w-full z-40 bg-[#FDFBF7]/80 backdrop-blur-md border-b border-slate-200">
+      <header className="fixed top-0 w-full z-40 bg-[#FDFBF7]/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
             <div 
                 className="flex items-center gap-2 cursor-pointer" 
                 onClick={() => { setCurrentTab('HOME'); handleReset(); }}
             >
                 <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold">A</div>
-                <span className="font-bold text-lg tracking-tight hidden md:block">스마트 스터디 AI</span>
+                <span className="font-bold text-lg tracking-tight hidden md:block dark:text-white">스마트 스터디 AI</span>
             </div>
             
             <div className="flex items-center gap-4">
                 {user ? (
                     <div className="flex items-center gap-3">
-                        <div className="hidden md:flex items-center gap-2 bg-white px-3 py-1 rounded-full border border-slate-200">
+                        <div className="hidden md:flex items-center gap-2 bg-white dark:bg-slate-800 px-3 py-1 rounded-full border border-slate-200 dark:border-slate-700">
                             <User size={14} className="text-slate-400"/>
-                            <span className="text-sm font-medium text-slate-600 truncate max-w-[100px]">
+                            <span className="text-sm font-medium text-slate-600 dark:text-slate-300 truncate max-w-[100px]">
                                 {user.displayName || user.email?.split('@')[0]}
                             </span>
                         </div>
                         <button 
+                            onClick={() => setShowSettingsModal(true)}
+                            className="p-2 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"
+                            title="설정"
+                        >
+                            <Settings size={20} />
+                        </button>
+                        <button 
                             onClick={handleLogout}
-                            className="text-sm font-medium text-slate-500 hover:text-red-500 transition-colors flex items-center gap-1"
+                            className="text-sm font-medium text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-colors flex items-center gap-1"
                         >
                             <LogOut size={16} /> <span className="hidden md:inline">로그아웃</span>
                         </button>
@@ -407,7 +591,7 @@ const App: React.FC = () => {
       {/* Main Content */}
       <main className="pt-20 pb-24 px-4 flex-grow w-full max-w-7xl mx-auto">
         {state.error && (
-            <div className="max-w-xl mx-auto mb-8 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-red-700 animate-fade-in">
+            <div className="max-w-xl mx-auto mb-8 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900 rounded-xl flex items-center gap-3 text-red-700 dark:text-red-400 animate-fade-in">
                 <CircleAlert size={20} />
                 <p>오류가 발생했습니다: {state.error}</p>
                 <button onClick={() => setState(s => ({...s, error: null}))} className="ml-auto text-sm underline">닫기</button>
@@ -420,12 +604,12 @@ const App: React.FC = () => {
             user ? (
                 <HistoryView history={historyItems} onSelectProblem={loadHistoryItem} />
             ) : (
-                <div className="text-center mt-20 p-6 bg-white rounded-2xl border border-slate-200 max-w-md mx-auto shadow-sm">
-                    <History size={48} className="mx-auto text-slate-300 mb-4" />
-                    <h3 className="text-lg font-bold text-slate-800 mb-2">학습 기록 보기</h3>
-                    <p className="text-slate-500 mb-6 text-sm">로그인하면 내가 푼 문제들을 저장하고<br/> 언제든지 복습할 수 있어요.</p>
+                <div className="text-center mt-20 p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 max-w-md mx-auto shadow-sm">
+                    <History size={48} className="mx-auto text-slate-300 dark:text-slate-600 mb-4" />
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2">학습 기록 보기</h3>
+                    <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm">로그인하면 내가 푼 문제들을 저장하고<br/> 언제든지 복습할 수 있어요.</p>
                     <div className="flex gap-3 justify-center">
-                         <button onClick={() => setShowLoginModal(true)} className="px-5 py-2 bg-blue-500 text-white rounded-lg font-bold text-sm">로그인하기</button>
+                         <button onClick={() => setShowLoginModal(true)} className="px-5 py-2 bg-blue-500 text-white rounded-lg font-bold text-sm hover:bg-blue-600 transition-colors">로그인하기</button>
                     </div>
                 </div>
             )
@@ -435,12 +619,12 @@ const App: React.FC = () => {
             user ? (
                 <QuizView history={historyItems} onExit={() => setCurrentTab('HOME')} />
             ) : (
-                <div className="text-center mt-20 p-6 bg-white rounded-2xl border border-slate-200 max-w-md mx-auto shadow-sm">
-                    <GraduationCap size={48} className="mx-auto text-slate-300 mb-4" />
-                    <h3 className="text-lg font-bold text-slate-800 mb-2">나만의 시험 보기</h3>
-                    <p className="text-slate-500 mb-6 text-sm">지금까지 푼 문제들을 바탕으로<br/>AI가 시험 문제를 만들어드려요.</p>
+                <div className="text-center mt-20 p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 max-w-md mx-auto shadow-sm">
+                    <GraduationCap size={48} className="mx-auto text-slate-300 dark:text-slate-600 mb-4" />
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2">나만의 시험 보기</h3>
+                    <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm">지금까지 푼 문제들을 바탕으로<br/>AI가 시험 문제를 만들어드려요.</p>
                     <div className="flex gap-3 justify-center">
-                         <button onClick={() => setShowLoginModal(true)} className="px-5 py-2 bg-blue-500 text-white rounded-lg font-bold text-sm">로그인하기</button>
+                         <button onClick={() => setShowLoginModal(true)} className="px-5 py-2 bg-blue-500 text-white rounded-lg font-bold text-sm hover:bg-blue-600 transition-colors">로그인하기</button>
                     </div>
                 </div>
             )
@@ -448,25 +632,25 @@ const App: React.FC = () => {
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 w-full bg-white border-t border-slate-200 pb-safe z-40">
+      <nav className="fixed bottom-0 w-full bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 pb-safe z-40 transition-colors duration-300">
         <div className="max-w-md mx-auto flex justify-around p-2">
             <button 
                 onClick={() => { setCurrentTab('HOME'); if(!state.data) handleReset(); }}
-                className={`flex flex-col items-center p-2 rounded-xl w-20 transition-colors ${currentTab === 'HOME' ? 'text-blue-600 bg-blue-50' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`flex flex-col items-center p-2 rounded-xl w-20 transition-colors ${currentTab === 'HOME' ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
             >
                 <Home size={24} />
                 <span className="text-[10px] font-bold mt-1">홈</span>
             </button>
             <button 
                 onClick={() => setCurrentTab('HISTORY')}
-                className={`flex flex-col items-center p-2 rounded-xl w-20 transition-colors ${currentTab === 'HISTORY' ? 'text-blue-600 bg-blue-50' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`flex flex-col items-center p-2 rounded-xl w-20 transition-colors ${currentTab === 'HISTORY' ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
             >
                 <History size={24} />
                 <span className="text-[10px] font-bold mt-1">기록</span>
             </button>
             <button 
                 onClick={() => setCurrentTab('QUIZ')}
-                className={`flex flex-col items-center p-2 rounded-xl w-20 transition-colors ${currentTab === 'QUIZ' ? 'text-blue-600 bg-blue-50' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`flex flex-col items-center p-2 rounded-xl w-20 transition-colors ${currentTab === 'QUIZ' ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
             >
                 <GraduationCap size={24} />
                 <span className="text-[10px] font-bold mt-1">시험</span>

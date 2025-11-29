@@ -87,8 +87,30 @@ const responseSchema: Schema = {
   required: ["ocrText", "tags", "difficulty", "goal", "requiredKnowledge", "finalAnswer", "steps", "similarProblems"]
 };
 
-export const analyzeMathProblem = async (file: File): Promise<ProblemAnalysis> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+export const validateApiKey = async (apiKey: string): Promise<boolean> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    // Try a very simple generation to test the key
+    await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{ parts: [{ text: "Hi" }] }],
+    });
+    return true;
+  } catch (error) {
+    console.error("API Key Validation Failed:", error);
+    return false;
+  }
+};
+
+export const analyzeMathProblem = async (file: File, apiKey?: string): Promise<ProblemAnalysis> => {
+  // Use user-provided API key if available, otherwise fallback to environment variable
+  const keyToUse = apiKey && apiKey.trim() !== "" ? apiKey : process.env.API_KEY;
+  
+  if (!keyToUse) {
+      throw new Error("API 키가 설정되지 않았습니다. 로그인 후 설정 메뉴에서 API 키를 등록해주세요.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey: keyToUse });
   const base64Data = await fileToGenerativePart(file);
 
   // Use the actual mime type of the file or fallback based on extension
@@ -199,7 +221,7 @@ export const analyzeMathProblem = async (file: File): Promise<ProblemAnalysis> =
     console.error("Gemini API Error:", e);
     if (e instanceof Error) {
         // Pass specific errors through
-        if (e.message.includes("지원되지 않는") || e.message.includes("안전 정책") || e.message.includes("저작권") || e.message.includes("잘렸습니다")) {
+        if (e.message.includes("지원되지 않는") || e.message.includes("안전 정책") || e.message.includes("저작권") || e.message.includes("잘렸습니다") || e.message.includes("API 키")) {
             throw e;
         }
         throw new Error(`AI 분석 중 오류가 발생했습니다: ${e.message}`);

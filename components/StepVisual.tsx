@@ -14,7 +14,7 @@ const StepVisual: React.FC<StepVisualProps> = ({ visualData }) => {
   // Handle Geometry/SVG type
   if ((visualData.type === DiagramType.GEOMETRY || visualData.svgCode) && visualData.svgCode) {
     return (
-        <div className="w-full aspect-square max-h-64 bg-slate-50 rounded-lg p-4 border border-slate-100 flex items-center justify-center my-4">
+        <div className="w-full aspect-square max-h-64 bg-slate-50 dark:bg-slate-900 rounded-lg p-4 border border-slate-100 dark:border-slate-700 flex items-center justify-center my-4">
              <div 
                 className="w-full h-full [&>svg]:w-full [&>svg]:h-full object-contain"
                 dangerouslySetInnerHTML={{ __html: visualData.svgCode }} 
@@ -26,12 +26,15 @@ const StepVisual: React.FC<StepVisualProps> = ({ visualData }) => {
   // Handle Bar Chart
   if (visualData.type === DiagramType.BAR && visualData.data) {
     return (
-      <div className="h-32 w-full mt-4 bg-white rounded-lg p-2 border border-slate-100">
+      <div className="h-32 w-full mt-4 bg-white dark:bg-slate-800 rounded-lg p-2 border border-slate-100 dark:border-slate-700">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={visualData.data} layout="vertical">
             <XAxis type="number" hide />
-            <YAxis type="category" dataKey="name" width={80} tick={{fontSize: 12}} />
-            <Tooltip cursor={{fill: 'transparent'}} />
+            <YAxis type="category" dataKey="name" width={80} tick={{fontSize: 12, fill: '#64748b'}} />
+            <Tooltip 
+                cursor={{fill: 'transparent'}} 
+                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+            />
             <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                 {visualData.data.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#60a5fa' : '#34d399'} />

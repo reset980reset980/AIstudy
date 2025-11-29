@@ -133,12 +133,12 @@ const UploadView: React.FC<UploadViewProps> = ({ onFileSelect, isLoading }) => {
   return (
     <div className="max-w-2xl mx-auto mt-12 p-4 animate-fade-in">
       <div className="text-center mb-10">
-        <h1 className="text-4xl font-extrabold text-slate-800 mb-4 tracking-tight">
+        <h1 className="text-4xl font-extrabold text-slate-800 dark:text-white mb-4 tracking-tight">
           스마트 스터디 <span className="text-blue-500">AI</span>
         </h1>
-        <p className="text-slate-500 text-lg">
+        <p className="text-slate-500 dark:text-slate-400 text-lg">
           틀린 문제를 찍어 올리세요. <br className="md:hidden" />
-          AI 선생님이 <span className="text-blue-600 font-bold">단계별 풀이</span>와 <span className="text-blue-600 font-bold">유사 문제</span>를 알려줄게요!
+          AI 선생님이 <span className="text-blue-600 dark:text-blue-400 font-bold">단계별 풀이</span>와 <span className="text-blue-600 dark:text-blue-400 font-bold">유사 문제</span>를 알려줄게요!
         </p>
       </div>
 
@@ -149,8 +149,8 @@ const UploadView: React.FC<UploadViewProps> = ({ onFileSelect, isLoading }) => {
             className={`
               relative border-2 border-dashed rounded-3xl p-8 text-center transition-all duration-300 flex flex-col items-center justify-center min-h-[240px]
               ${isLoading 
-                ? 'border-blue-300 bg-blue-50 cursor-wait' 
-                : 'border-slate-300 hover:border-blue-400 hover:bg-white bg-slate-50 cursor-pointer shadow-sm hover:shadow-md'
+                ? 'border-blue-300 bg-blue-50 dark:bg-blue-900/20 cursor-wait' 
+                : 'border-slate-300 dark:border-slate-600 hover:border-blue-400 hover:bg-white dark:hover:bg-slate-800 bg-slate-50 dark:bg-slate-800 cursor-pointer shadow-sm hover:shadow-md'
               }
             `}
           >
@@ -165,15 +165,15 @@ const UploadView: React.FC<UploadViewProps> = ({ onFileSelect, isLoading }) => {
             {isLoading ? (
                 <div className="flex flex-col items-center">
                    <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
-                   <p className="text-blue-600 font-semibold animate-pulse">분석 중...</p>
+                   <p className="text-blue-600 dark:text-blue-400 font-semibold animate-pulse">분석 중...</p>
                 </div>
             ) : (
                 <>
-                   <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm text-blue-500 mb-4">
+                   <div className="w-16 h-16 bg-white dark:bg-slate-700 rounded-full flex items-center justify-center shadow-sm text-blue-500 dark:text-blue-400 mb-4">
                      <Upload size={28} />
                    </div>
-                   <p className="font-bold text-slate-700 text-lg">파일 업로드</p>
-                   <p className="text-slate-400 text-sm mt-1">이미지, PDF, 문서 지원</p>
+                   <p className="font-bold text-slate-700 dark:text-white text-lg">파일 업로드</p>
+                   <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">이미지, PDF, 문서 지원</p>
                 </>
             )}
           </div>
@@ -181,46 +181,46 @@ const UploadView: React.FC<UploadViewProps> = ({ onFileSelect, isLoading }) => {
           <button
             onClick={startCamera}
             disabled={isLoading}
-            className="border-2 border-slate-300 bg-slate-50 hover:bg-white hover:border-blue-400 hover:shadow-md rounded-3xl p-8 flex flex-col items-center justify-center min-h-[240px] transition-all duration-300 group"
+            className="border-2 border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 hover:bg-white dark:hover:bg-slate-700 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md rounded-3xl p-8 flex flex-col items-center justify-center min-h-[240px] transition-all duration-300 group"
           >
-             <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm text-purple-500 mb-4 group-hover:scale-110 transition-transform">
+             <div className="w-16 h-16 bg-white dark:bg-slate-700 rounded-full flex items-center justify-center shadow-sm text-purple-500 dark:text-purple-400 mb-4 group-hover:scale-110 transition-transform">
                 <Camera size={28} />
              </div>
-             <p className="font-bold text-slate-700 text-lg">카메라 촬영</p>
-             <p className="text-slate-400 text-sm mt-1">시험지, 문제집 바로 찍기</p>
+             <p className="font-bold text-slate-700 dark:text-white text-lg">카메라 촬영</p>
+             <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">시험지, 문제집 바로 찍기</p>
           </button>
       </div>
       
       {!isLoading && (
-         <div className="mt-8 bg-white rounded-2xl p-8 border border-slate-100 shadow-sm">
-            <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+         <div className="mt-8 bg-white dark:bg-slate-800 rounded-2xl p-8 border border-slate-100 dark:border-slate-700 shadow-sm">
+            <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
                <span className="text-blue-500 text-2xl">💡</span> 사용 방법
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                <div className="flex flex-col items-center text-center">
-                  <div className="w-12 h-12 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mb-3">
+                  <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400 rounded-full flex items-center justify-center mb-3">
                      <Aperture size={24} />
                   </div>
-                  <h4 className="font-bold text-slate-700 mb-1">1. 문제 선택</h4>
-                  <p className="text-sm text-slate-500 leading-snug">
+                  <h4 className="font-bold text-slate-700 dark:text-slate-200 mb-1">1. 문제 선택</h4>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 leading-snug">
                      사진은 원하는 문제만 잘라내고,<br/>문서는 바로 분석합니다.
                   </p>
                </div>
                <div className="flex flex-col items-center text-center">
-                  <div className="w-12 h-12 bg-purple-50 text-purple-500 rounded-full flex items-center justify-center mb-3">
+                  <div className="w-12 h-12 bg-purple-50 dark:bg-purple-900/30 text-purple-500 dark:text-purple-400 rounded-full flex items-center justify-center mb-3">
                      <BrainCircuit size={24} />
                   </div>
-                  <h4 className="font-bold text-slate-700 mb-1">2. AI 분석</h4>
-                  <p className="text-sm text-slate-500 leading-snug">
+                  <h4 className="font-bold text-slate-700 dark:text-slate-200 mb-1">2. AI 분석</h4>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 leading-snug">
                      AI 선생님이 문제를 인식하고<br/>풀이 과정을 분석해요.
                   </p>
                </div>
                <div className="flex flex-col items-center text-center">
-                  <div className="w-12 h-12 bg-green-50 text-green-500 rounded-full flex items-center justify-center mb-3">
+                  <div className="w-12 h-12 bg-green-50 dark:bg-green-900/30 text-green-500 dark:text-green-400 rounded-full flex items-center justify-center mb-3">
                      <PenTool size={24} />
                   </div>
-                  <h4 className="font-bold text-slate-700 mb-1">3. 맞춤 학습</h4>
-                  <p className="text-sm text-slate-500 leading-snug">
+                  <h4 className="font-bold text-slate-700 dark:text-slate-200 mb-1">3. 맞춤 학습</h4>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 leading-snug">
                      단계별 풀이를 익히고<br/>유사 문제로 복습해요.
                   </p>
                </div>

@@ -110,21 +110,21 @@ const ProblemSelector: React.FC<ProblemSelectorProps> = ({ imageUrl, onConfirm, 
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-100px)] animate-fade-in p-4">
-      <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200 max-w-4xl w-full">
+      <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 max-w-4xl w-full">
         <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-slate-800 flex items-center justify-center gap-2">
+            <h2 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center justify-center gap-2">
                 <Crop className="text-blue-500" />
                 문제 선택하기
             </h2>
-            <p className="text-slate-500 mt-2">
+            <p className="text-slate-500 dark:text-slate-400 mt-2">
                 사진 속에 여러 문제가 있다면, <br className="md:hidden"/>
-                <span className="text-blue-600 font-bold">풀고 싶은 문제만 드래그</span>해서 선택해주세요.
+                <span className="text-blue-600 dark:text-blue-400 font-bold">풀고 싶은 문제만 드래그</span>해서 선택해주세요.
             </p>
         </div>
 
         <div 
             ref={containerRef}
-            className="relative w-full bg-slate-100 rounded-lg overflow-hidden cursor-crosshair touch-none select-none mx-auto border border-slate-300"
+            className="relative w-full bg-slate-100 dark:bg-slate-900 rounded-lg overflow-hidden cursor-crosshair touch-none select-none mx-auto border border-slate-300 dark:border-slate-600"
             style={{ maxWidth: '600px' }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
@@ -185,7 +185,7 @@ const ProblemSelector: React.FC<ProblemSelectorProps> = ({ imageUrl, onConfirm, 
         <div className="flex justify-center gap-4 mt-8">
             <button 
                 onClick={onCancel}
-                className="px-6 py-3 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors flex items-center gap-2"
+                className="px-6 py-3 rounded-xl font-bold text-slate-600 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center gap-2"
             >
                 <X size={20} /> 취소
             </button>

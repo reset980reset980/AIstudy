@@ -59,39 +59,39 @@ const QuizView: React.FC<QuizViewProps> = ({ history, onExit }) => {
   if (history.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-96 text-center p-8">
-        <GraduationCap size={48} className="text-slate-300 mb-4" />
-        <h3 className="text-xl font-bold text-slate-800">문제가 부족해요</h3>
-        <p className="text-slate-500 mt-2">
+        <GraduationCap size={48} className="text-slate-300 dark:text-slate-600 mb-4" />
+        <h3 className="text-xl font-bold text-slate-800 dark:text-white">문제가 부족해요</h3>
+        <p className="text-slate-500 dark:text-slate-400 mt-2">
           먼저 문제를 업로드하여 학습 기록을 쌓아주세요.<br/>
           최소 1개의 학습 기록이 필요합니다.
         </p>
-        <button onClick={onExit} className="mt-6 px-6 py-2 bg-blue-500 text-white rounded-lg">돌아가기</button>
+        <button onClick={onExit} className="mt-6 px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">돌아가기</button>
       </div>
     );
   }
 
   if (isFinished) {
     return (
-      <div className="bg-white rounded-3xl p-8 border border-slate-200 text-center animate-fade-in max-w-lg mx-auto mt-10 shadow-lg">
-        <div className="w-24 h-24 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
-          <Trophy size={48} className="text-yellow-600" />
+      <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 border border-slate-200 dark:border-slate-700 text-center animate-fade-in max-w-lg mx-auto mt-10 shadow-lg">
+        <div className="w-24 h-24 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+          <Trophy size={48} className="text-yellow-600 dark:text-yellow-500" />
         </div>
-        <h2 className="text-3xl font-bold text-slate-800 mb-2">시험 종료!</h2>
-        <p className="text-slate-500 mb-8">수고하셨습니다.</p>
+        <h2 className="text-3xl font-bold text-slate-800 dark:text-white mb-2">시험 종료!</h2>
+        <p className="text-slate-500 dark:text-slate-400 mb-8">수고하셨습니다.</p>
         
-        <div className="text-5xl font-black text-blue-600 mb-2">{score * (100 / questions.length)}점</div>
+        <div className="text-5xl font-black text-blue-600 dark:text-blue-400 mb-2">{Math.round(score * (100 / questions.length))}점</div>
         <p className="text-sm text-slate-400 mb-8">{questions.length}문제 중 {score}문제 정답</p>
 
         <div className="space-y-3 mb-8">
           {questions.map((q, idx) => (
-            <div key={q.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg text-sm">
-              <span className="text-slate-600 font-medium truncate w-1/2 text-left">
+            <div key={q.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700 rounded-lg text-sm">
+              <span className="text-slate-600 dark:text-slate-200 font-medium truncate w-1/2 text-left">
                 {idx + 1}. {q.question}
               </span>
               {q.isCorrect ? (
-                <span className="text-green-600 font-bold flex items-center gap-1"><CheckCircle size={14}/> 정답</span>
+                <span className="text-green-600 dark:text-green-400 font-bold flex items-center gap-1"><CheckCircle size={14}/> 정답</span>
               ) : (
-                <span className="text-red-500 font-bold flex items-center gap-1"><XCircle size={14}/> 오답</span>
+                <span className="text-red-500 dark:text-red-400 font-bold flex items-center gap-1"><XCircle size={14}/> 오답</span>
               )}
             </div>
           ))}
@@ -99,7 +99,7 @@ const QuizView: React.FC<QuizViewProps> = ({ history, onExit }) => {
 
         <button 
           onClick={onExit}
-          className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors"
+          className="w-full py-3 bg-slate-800 dark:bg-slate-600 text-white rounded-xl font-bold hover:bg-slate-700 dark:hover:bg-slate-500 transition-colors"
         >
           확인
         </button>
@@ -107,7 +107,7 @@ const QuizView: React.FC<QuizViewProps> = ({ history, onExit }) => {
     );
   }
 
-  if (questions.length === 0) return <div>로딩 중...</div>;
+  if (questions.length === 0) return <div className="dark:text-white text-center mt-20">로딩 중...</div>;
 
   const currentQ = questions[currentIndex];
 
@@ -115,26 +115,26 @@ const QuizView: React.FC<QuizViewProps> = ({ history, onExit }) => {
     <div className="max-w-2xl mx-auto mt-8 p-4 animate-fade-in">
       {/* Progress */}
       <div className="flex justify-between items-center mb-6">
-        <span className="text-sm font-bold text-slate-500">
+        <span className="text-sm font-bold text-slate-500 dark:text-slate-400">
           문제 {currentIndex + 1} / {questions.length}
         </span>
-        <button onClick={onExit} className="text-sm text-slate-400 hover:text-slate-600">
+        <button onClick={onExit} className="text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
           나가기
         </button>
       </div>
-      <div className="w-full h-2 bg-slate-100 rounded-full mb-8">
+      <div className="w-full h-2 bg-slate-100 dark:bg-slate-700 rounded-full mb-8">
         <div 
-          className="h-full bg-blue-500 rounded-full transition-all duration-300" 
+          className="h-full bg-blue-500 dark:bg-blue-600 rounded-full transition-all duration-300" 
           style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
         />
       </div>
 
       {/* Question Card */}
-      <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-200 mb-8 min-h-[300px] flex flex-col">
-        <span className="inline-block px-3 py-1 bg-blue-50 text-blue-600 text-xs font-bold rounded-full mb-4 self-start">
+      <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 shadow-sm border border-slate-200 dark:border-slate-700 mb-8 min-h-[300px] flex flex-col transition-colors">
+        <span className="inline-block px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-bold rounded-full mb-4 self-start">
           문제
         </span>
-        <h3 className="text-xl md:text-2xl font-bold text-slate-800 leading-relaxed mb-8 flex-grow whitespace-pre-wrap">
+        <h3 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white leading-relaxed mb-8 flex-grow whitespace-pre-wrap">
           {currentQ.question}
         </h3>
 
@@ -143,33 +143,33 @@ const QuizView: React.FC<QuizViewProps> = ({ history, onExit }) => {
              <input 
                 type="text" 
                 placeholder="정답을 입력하거나 생각해 보세요"
-                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 transition-colors"
+                className="w-full p-4 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:border-blue-400 dark:text-white transition-colors"
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
              />
              <button 
                 onClick={handleCheckAnswer}
-                className="w-full py-4 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-600 transition-colors shadow-lg shadow-blue-200"
+                className="w-full py-4 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-600 transition-colors shadow-lg shadow-blue-200 dark:shadow-none"
              >
                 정답 확인하기
              </button>
           </div>
         ) : (
-          <div className="animate-fade-in bg-slate-50 rounded-xl p-6 border border-slate-100">
-            <p className="text-sm text-slate-500 mb-2 font-bold">정답</p>
-            <p className="text-2xl font-bold text-blue-600 mb-6">{currentQ.answer}</p>
+          <div className="animate-fade-in bg-slate-50 dark:bg-slate-900/50 rounded-xl p-6 border border-slate-100 dark:border-slate-700">
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-2 font-bold">정답</p>
+            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-6">{currentQ.answer}</p>
             
-            <p className="text-center text-slate-700 font-medium mb-4">맞추셨나요?</p>
+            <p className="text-center text-slate-700 dark:text-slate-300 font-medium mb-4">맞추셨나요?</p>
             <div className="flex gap-4">
               <button 
                 onClick={() => handleMark(false)}
-                className="flex-1 py-3 border-2 border-red-100 bg-white text-red-500 rounded-xl font-bold hover:bg-red-50 transition-colors flex items-center justify-center gap-2"
+                className="flex-1 py-3 border-2 border-red-100 dark:border-red-900/30 bg-white dark:bg-slate-800 text-red-500 dark:text-red-400 rounded-xl font-bold hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex items-center justify-center gap-2"
               >
                 <XCircle /> 틀렸어요
               </button>
               <button 
                 onClick={() => handleMark(true)}
-                className="flex-1 py-3 bg-green-500 text-white rounded-xl font-bold hover:bg-green-600 transition-colors shadow-lg shadow-green-200 flex items-center justify-center gap-2"
+                className="flex-1 py-3 bg-green-500 text-white rounded-xl font-bold hover:bg-green-600 transition-colors shadow-lg shadow-green-200 dark:shadow-none flex items-center justify-center gap-2"
               >
                 <CheckCircle /> 맞았어요!
               </button>
