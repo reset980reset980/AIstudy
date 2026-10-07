@@ -4,12 +4,12 @@ import { getFirestore } from "firebase/firestore";
 
 // Configuration provided by the user
 const firebaseConfig = {
-  apiKey: "AIzaSyANbQj7Zx1slQLMUX5pWhbacrtjITslsIk",
-  authDomain: "mathmate-aaa89.firebaseapp.com",
-  projectId: "mathmate-aaa89",
-  storageBucket: "mathmate-aaa89.firebasestorage.app",
-  messagingSenderId: "243494921750",
-  appId: "1:243494921750:web:5518e333ee2359a4743737"
+  apiKey: "AIzaSyAdQknJa8uae3VKvJM-oRkpniSELP8TqGY",
+  authDomain: "a-istudy-cebe2.firebaseapp.com",
+  projectId: "a-istudy-cebe2",
+  storageBucket: "a-istudy-cebe2.firebasestorage.app",
+  messagingSenderId: "791132793786",
+  appId: "1:791132793786:web:a5edd1e8e01baaa0dd0b83"
 };
 
 // Initialize Firebase
