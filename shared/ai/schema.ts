@@ -40,6 +40,28 @@ const stepSchema = {
   additionalProperties: false,
 };
 
+const similarItemSchema = {
+  type: 'object',
+  properties: {
+    question: str('문제'),
+    answer: str('짧은 정답 (숫자·식·단어). 채점에 쓰이므로 설명 없이'),
+    hint: str('힌트 한 문장'),
+    svgCode: str('도형이 꼭 필요할 때만 SVG, 아니면 빈 문자열'),
+    steps: { type: 'array', items: stepSchema },
+  },
+  required: ['question', 'answer', 'hint', 'svgCode', 'steps'],
+  additionalProperties: false,
+};
+
+export const moreSimilarSchema = {
+  type: 'object',
+  properties: {
+    similarProblems: { type: 'array', description: '새 유사 문제 정확히 3개', items: similarItemSchema },
+  },
+  required: ['similarProblems'],
+  additionalProperties: false,
+};
+
 export const analysisSchema = {
   type: 'object',
   properties: {
@@ -53,18 +75,7 @@ export const analysisSchema = {
     similarProblems: {
       type: 'array',
       description: '유사 문제 정확히 3개',
-      items: {
-        type: 'object',
-        properties: {
-          question: str('문제'),
-          answer: str('짧은 정답 (숫자·식·단어). 채점에 쓰이므로 설명 없이'),
-          hint: str('힌트 한 문장'),
-          svgCode: str('도형이 꼭 필요할 때만 SVG, 아니면 빈 문자열'),
-          steps: { type: 'array', items: stepSchema },
-        },
-        required: ['question', 'answer', 'hint', 'svgCode', 'steps'],
-        additionalProperties: false,
-      },
+      items: similarItemSchema,
     },
   },
   required: ['ocrText', 'tags', 'difficulty', 'goal', 'requiredKnowledge', 'steps', 'finalAnswer', 'similarProblems'],
@@ -114,4 +125,27 @@ ${answer}
 ${studentAnswer}
 
 feedback에는 맞으면 칭찬 한 문장, 틀리면 어디서 틀렸을지 짧은 힌트를 쓰세요(정답을 그대로 말하지 말 것).`;
+}
+
+export function buildMoreSimilarPrompt(gradeLevel: string): string {
+  const level = gradeLevel && gradeLevel !== 'auto' ? `학생은 ${gradeLevel}입니다.` : '원래 문제와 같은 수준으로 만드세요.';
+  return `당신은 친절하고 정확한 'AI 선생님'입니다. ${level}
+원래 문제와 같은 개념을 연습할 수 있는 새 유사 문제를 정확히 3개 만드세요.
+- 이미 낸 문제와 수·상황·형태가 겹치지 않게 하세요. 난이도는 쉬운 것부터 조금씩 올리세요.
+- 정답은 반드시 검산하고, answer는 '12', '3/4', '①'처럼 짧게만 쓰세요.
+- 풀이 steps는 2~4단계로 간결하게. 첫 단계에서 정답을 미리 말하지 마세요.
+- 도형이 꼭 필요할 때만 svgCode에 viewBox="0 0 300 300" 단순 SVG, 아니면 빈 문자열. visualData는 필요 없으면 type NONE.
+모든 내용은 한국어로, 주어진 JSON 스키마를 정확히 따르세요.`;
+}
+
+export function buildMoreSimilarUserText(a: { ocrText: string; finalAnswer: string; tags: string[]; goal: string }, existing: string[]): string {
+  return `[원래 문제]
+${a.ocrText}
+
+[원래 정답] ${a.finalAnswer}
+[개념] ${(a.tags || []).join(', ')}
+[목표] ${a.goal}
+
+[이미 낸 유사 문제 — 겹치지 않게]
+${existing.map((q, i) => `${i + 1}. ${q}`).join('\n')}`;
 }

@@ -5,8 +5,8 @@ import { auth } from './firebase';
 import UploadView from './components/UploadView';
 import LoginModal from './components/LoginModal';
 import { ToastProvider, useToast } from './components/Toast';
-import { analyzeProblem, defaultSettings, isAdminUser, pickProvider } from './services/aiClient';
-import { addHistory, deleteHistory, fetchHistory, loadSettings, saveSettings } from './services/userData';
+import { analyzeProblem, defaultSettings, isAdminUser, moreSimilarProblems, pickProvider } from './services/aiClient';
+import { addHistory, deleteHistory, fetchHistory, loadSettings, saveSettings, updateSimilarProblems } from './services/userData';
 import { PROVIDERS } from './shared/ai/models';
 import type { AnalysisState, ProblemHistoryItem, UserSettings } from './types';
 
@@ -159,6 +159,7 @@ const AppInner: React.FC = () => {
         try {
           const item = await addHistory(user.uid, data);
           setHistory((h) => [item, ...h]);
+          setState((st) => (st.data === data ? { ...st, data: item } : st)); // 저장된 id를 붙여 두기
         } catch (e) {
           console.error(e);
           toast('풀이는 완료됐지만 기록 저장에 실패했습니다.', 'error');
@@ -192,6 +193,25 @@ const AppInner: React.FC = () => {
     runAnalysis(cropped);
   };
 
+  const handleMoreSimilar = async () => {
+    const current = state.data;
+    if (!current) return;
+    try {
+      const added = await moreSimilarProblems(current, settings, admin);
+      if (added.length === 0) { toast('새 문제를 만들지 못했어요. 다시 눌러 주세요.', 'error'); return; }
+      const merged = [...(current.similarProblems || []), ...added];
+      const id = (current as Partial<ProblemHistoryItem>).id;
+      setState((st) => (st.data ? { ...st, data: { ...st.data, similarProblems: merged } } : st));
+      if (id) {
+        setHistory((h) => h.map((x) => (x.id === id ? { ...x, similarProblems: merged } : x)));
+        updateSimilarProblems(id, merged).catch((e) => { console.error(e); toast('새 문제를 기록에 저장하지 못했습니다.', 'error'); });
+      }
+      toast(`새 문제 ${added.length}개를 만들었어요!`, 'success');
+    } catch (e: any) {
+      toast(e?.message || '새 문제를 만들지 못했습니다.', 'error');
+    }
+  };
+
   const handleDelete = async (item: ProblemHistoryItem) => {
     try {
       await deleteHistory(item.id);
@@ -214,7 +234,7 @@ const AppInner: React.FC = () => {
   else if (!user) home = <WelcomeView onLogin={() => setShowLogin(true)} />;
   else if (state.isLoading) home = <UploadView onFileSelect={() => {}} isLoading statusMessage={statusMessage} />;
   else if (rawImageUrl) home = <ProblemSelector imageUrl={rawImageUrl} onConfirm={handleCropConfirm} onCancel={clearImages} />;
-  else if (state.data) home = <AnalysisView analysis={state.data} originalImageUrl={finalImageUrl} onReset={handleReset} />;
+  else if (state.data) home = <AnalysisView analysis={state.data} originalImageUrl={finalImageUrl} onReset={handleReset} onMore={user && activeProvider ? handleMoreSimilar : undefined} />;
   else home = (
     <UploadView
       onFileSelect={handleFileSelect}

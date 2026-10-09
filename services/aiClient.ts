@@ -4,9 +4,9 @@
 
 import { auth } from '../firebase';
 import { PROVIDERS, PROVIDER_ORDER, type ProviderId } from '../shared/ai/models';
-import { analysisSchema, buildAnalysisPrompt, buildGradePrompt, gradeSchema } from '../shared/ai/schema';
+import { analysisSchema, buildAnalysisPrompt, buildGradePrompt, buildMoreSimilarPrompt, buildMoreSimilarUserText, gradeSchema, moreSimilarSchema } from '../shared/ai/schema';
 import { AIError, generateStructured, testApiKey, type FileInput, type StructuredRequest } from '../shared/ai/providers';
-import type { ProblemAnalysis, UserSettings } from '../types';
+import type { ProblemAnalysis, SimilarProblem, UserSettings } from '../types';
 
 export const ADMIN_EMAILS = ['reset98@gmail.com'];
 
@@ -243,4 +243,36 @@ export async function testKey(provider: ProviderId, settings: UserSettings, admi
 
 export async function encryptKeyOnServer(provider: ProviderId, key: string): Promise<{ cipher: string; last4: string }> {
   return callServer('encrypt', { provider, key });
+}
+
+// ---------- 유사 문제 더 만들기 ----------
+
+export async function moreSimilarProblems(analysis: ProblemAnalysis, settings: UserSettings, admin: boolean): Promise<SimilarProblem[]> {
+  const provider = pickProvider(settings, admin);
+  if (!provider) throw new AIError('AI 키가 없습니다. 설정에서 키를 등록해 주세요.', 'auth');
+  const model = settings.models[provider] || PROVIDERS[provider].defaultModel;
+  const existing = (analysis.similarProblems || []).map((p) => p.question);
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const r = await run<{ similarProblems: SimilarProblem[] }>(
+        { settings, admin, provider, model },
+        {
+          system: buildMoreSimilarPrompt(settings.gradeLevel),
+          userText: buildMoreSimilarUserText(analysis, existing),
+          schema: moreSimilarSchema,
+          schemaName: 'more_similar',
+          maxTokens: 12000,
+        },
+      );
+      const fixed = normalizeAnalysis({ ...analysis, similarProblems: r.similarProblems || [] }).similarProblems;
+      const seen = new Set(existing.map((q) => q.replace(/\s/g, '')));
+      return fixed.filter((p) => p.question && p.answer && !seen.has(p.question.replace(/\s/g, '')));
+    } catch (e) {
+      lastError = e;
+      if (!(e instanceof AIError) || !e.retryable) break;
+      await sleep(1500);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new AIError('문제를 만들지 못했습니다.', 'unknown');
 }

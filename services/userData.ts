@@ -1,7 +1,7 @@
-import { collection, addDoc, query, where, getDocs, doc, setDoc, getDoc, deleteDoc, orderBy, limit } from 'firebase/firestore/lite';
+import { collection, addDoc, query, where, getDocs, doc, setDoc, getDoc, deleteDoc, updateDoc, orderBy, limit } from 'firebase/firestore/lite';
 import { db } from '../firebase';
 import { PROVIDERS, PROVIDER_ORDER, isKnownModel, type ProviderId } from '../shared/ai/models';
-import type { ProblemAnalysis, ProblemHistoryItem, QuizResult, UserSettings } from '../types';
+import type { ProblemAnalysis, ProblemHistoryItem, QuizResult, SimilarProblem, UserSettings } from '../types';
 import { defaultSettings } from './aiClient';
 
 const settingsRef = (uid: string) => doc(db, 'users', uid, 'settings', 'config');
@@ -73,4 +73,8 @@ export async function fetchQuizResults(uid: string): Promise<QuizResult[]> {
 
 export function providerLabel(p: ProviderId | undefined): string {
   return p ? PROVIDERS[p].name : '';
+}
+
+export async function updateSimilarProblems(id: string, similarProblems: SimilarProblem[]): Promise<void> {
+  await updateDoc(doc(db, 'problems', id), { similarProblems: clean(similarProblems) });
 }

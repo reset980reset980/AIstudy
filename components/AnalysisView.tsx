@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Loader2, Plus } from 'lucide-react';
 import { ProblemAnalysis, SimilarProblem } from '../types';
 import StepVisual from './StepVisual';
 import SafeSvg from './SafeSvg';
@@ -9,10 +10,18 @@ interface AnalysisViewProps {
   analysis: ProblemAnalysis;
   originalImageUrl: string | null;
   onReset: () => void;
+  /** 같은 개념의 새 유사 문제 3개 더 만들기 */
+  onMore?: () => Promise<void>;
 }
 
-const AnalysisView: React.FC<AnalysisViewProps> = ({ analysis, originalImageUrl, onReset }) => {
+const AnalysisView: React.FC<AnalysisViewProps> = ({ analysis, originalImageUrl, onReset, onMore }) => {
   const [selectedSimilarProblem, setSelectedSimilarProblem] = useState<SimilarProblem | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const handleMore = async () => {
+    if (!onMore) return;
+    setLoadingMore(true);
+    try { await onMore(); } finally { setLoadingMore(false); }
+  };
 
   return (
     <div className="w-full max-w-7xl mx-auto sm:p-4 space-y-8 animate-fade-in pb-20">
@@ -204,6 +213,20 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ analysis, originalImageUrl,
             ))}
         </div>
       </div>
+
+      {onMore && (
+        <div className="flex flex-col items-center gap-2 -mt-2">
+          <button
+            onClick={handleMore}
+            disabled={loadingMore}
+            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-full font-bold hover:bg-blue-700 disabled:opacity-60 shadow-lg shadow-blue-200 dark:shadow-none transition-colors"
+          >
+            {loadingMore ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}
+            {loadingMore ? 'AI가 새 문제를 만드는 중...' : '다른 문제 더 풀어보기'}
+          </button>
+          <p className="text-xs text-slate-400">같은 개념으로 새 문제 3개를 더 만들어요. 시험 탭에도 함께 출제돼요.</p>
+        </div>
+      )}
 
       <div className="flex justify-center mt-12">
         <button 
