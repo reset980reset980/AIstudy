@@ -16,6 +16,8 @@ export async function loadSettings(uid: string): Promise<{ settings: UserSetting
   if (d.theme === 'dark' || d.theme === 'light') s.theme = d.theme;
   if (typeof d.gradeLevel === 'string') s.gradeLevel = d.gradeLevel;
   if (PROVIDER_ORDER.includes(d.provider)) s.provider = d.provider;
+  if (typeof d.fallback === 'boolean') s.fallback = d.fallback;
+  if (typeof d.fallbackGemini === 'boolean') s.fallbackGemini = d.fallbackGemini;
   for (const p of PROVIDER_ORDER) {
     if (isKnownModel(p, d.models?.[p])) s.models[p] = d.models[p];
     if (typeof d.keys?.[p] === 'string' && d.keys[p]) s.keys[p] = d.keys[p];
@@ -33,6 +35,8 @@ export async function saveSettings(uid: string, s: UserSettings, admin: boolean)
     theme: s.theme,
     gradeLevel: s.gradeLevel,
     provider: s.provider,
+    fallback: s.fallback,
+    fallbackGemini: s.fallbackGemini,
     models: s.models,
     updatedAt: Date.now(),
   };

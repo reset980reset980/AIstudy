@@ -20,6 +20,8 @@ export function defaultSettings(): UserSettings {
     theme: 'light',
     gradeLevel: 'auto',
     provider: 'anthropic', // 가성비 기본값: Claude Haiku 5.5
+    fallback: true,
+    fallbackGemini: false,
     models: {
       gemini: PROVIDERS.gemini.defaultModel,
       openai: PROVIDERS.openai.defaultModel,
@@ -38,6 +40,45 @@ export function hasKey(s: UserSettings, p: ProviderId, admin: boolean): boolean 
 export function pickProvider(s: UserSettings, admin: boolean): ProviderId | null {
   if (hasKey(s, s.provider, admin)) return s.provider;
   return PROVIDER_ORDER.find((p) => hasKey(s, p, admin)) || null;
+}
+
+/** 시도 순서: 선택한 AI → 나머지(OpenAI·Claude) → Gemini(설정에서 켰을 때만) */
+export function providerChain(s: UserSettings, admin: boolean): ProviderId[] {
+  const first = pickProvider(s, admin);
+  if (!first) return [];
+  if (!s.fallback) return [first];
+  const rest = (['openai', 'anthropic', 'gemini'] as ProviderId[])
+    .filter((p) => p !== first && hasKey(s, p, admin))
+    .filter((p) => p !== 'gemini' || s.fallbackGemini);
+  return [first, ...rest];
+}
+
+/** 선택한 AI가 실패하면 다음 AI로 넘어가며 같은 작업을 다시 시도 */
+async function withFallback<T>(
+  s: UserSettings,
+  admin: boolean,
+  task: (provider: ProviderId) => Promise<T>,
+  onSwitch?: (from: ProviderId, to: ProviderId) => void,
+): Promise<T> {
+  const chain = providerChain(s, admin);
+  if (chain.length === 0) {
+    throw new AIError('AI 키가 없습니다. 오른쪽 위 ⚙️ 설정에서 OpenAI·Claude·Gemini 중 하나의 키를 등록해 주세요.', 'auth');
+  }
+  let lastError: unknown;
+  for (let i = 0; i < chain.length; i++) {
+    try {
+      return await task(chain[i]);
+    } catch (e) {
+      lastError = e;
+      if (!(e instanceof AIError)) throw e; // 파일 문제 등 AI와 무관한 오류는 바로 알림
+      if (e.code === 'unsupported' && /파일|PDF|사진/.test(e.message)) throw e;
+      if (i < chain.length - 1) onSwitch?.(chain[i], chain[i + 1]);
+    }
+  }
+  if (chain.length > 1 && lastError instanceof AIError) {
+    throw new AIError(`${lastError.message}\n(등록된 다른 AI로도 시도했지만 모두 실패했습니다.)`, lastError.code);
+  }
+  throw lastError;
 }
 
 // ---------- 파일 준비 ----------
@@ -150,40 +191,41 @@ function normalizeAnalysis(a: ProblemAnalysis): ProblemAnalysis {
 }
 
 export async function analyzeProblem(file: File, settings: UserSettings, admin: boolean, onStatus?: (msg: string) => void): Promise<ProblemAnalysis> {
-  const provider = pickProvider(settings, admin);
-  if (!provider) {
-    throw new AIError('AI 키가 없습니다. 오른쪽 위 ⚙️ 설정에서 Gemini·OpenAI·Claude 중 하나의 키를 등록해 주세요.', 'auth');
+  if (providerChain(settings, admin).length === 0) {
+    throw new AIError('AI 키가 없습니다. 오른쪽 위 ⚙️ 설정에서 OpenAI·Claude·Gemini 중 하나의 키를 등록해 주세요.', 'auth');
   }
-  const model = settings.models[provider] || PROVIDERS[provider].defaultModel;
   onStatus?.('사진을 준비하는 중...');
   const fileInput = await prepareFile(file, admin);
-  const opts: RunOptions = { settings, admin, provider, model };
 
-  let concise = false;
-  let lastError: unknown;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      onStatus?.(attempt === 0 ? `${PROVIDERS[provider].name}가 문제를 풀고 있어요...` : '답변을 다시 받아오는 중...');
-      const result = await run<ProblemAnalysis>(opts, {
-        system: buildAnalysisPrompt(settings.gradeLevel, concise),
-        userText: '이 문제를 분석하고 단계별로 풀이해 주세요. 유사 문제는 꼭 3개 만들어 주세요.',
-        file: fileInput,
-        schema: analysisSchema,
-        schemaName: 'problem_analysis',
-        maxTokens: concise ? 24000 : 16000,
-      });
-      return { ...normalizeAnalysis(result), aiProvider: provider, aiModel: model };
-    } catch (e) {
-      lastError = e;
-      if (!(e instanceof AIError) || !e.retryable || attempt === 2) break;
-      if (e.code === 'truncated' || e.code === 'format') concise = true;
-      else await sleep(1500 * (attempt + 1));
+  return withFallback(settings, admin, async (provider) => {
+    const model = settings.models[provider] || PROVIDERS[provider].defaultModel;
+    const opts: RunOptions = { settings, admin, provider, model };
+    let concise = false;
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        onStatus?.(attempt === 0 ? `${PROVIDERS[provider].name}가 문제를 풀고 있어요...` : `${PROVIDERS[provider].name}에서 답변을 다시 받아오는 중...`);
+        const result = await run<ProblemAnalysis>(opts, {
+          system: buildAnalysisPrompt(settings.gradeLevel, concise),
+          userText: '이 문제를 분석하고 단계별로 풀이해 주세요. 유사 문제는 꼭 3개 만들어 주세요.',
+          file: fileInput,
+          schema: analysisSchema,
+          schemaName: 'problem_analysis',
+          maxTokens: concise ? 24000 : 16000,
+        });
+        return { ...normalizeAnalysis(result), aiProvider: provider, aiModel: model };
+      } catch (e) {
+        lastError = e;
+        if (!(e instanceof AIError) || !e.retryable || attempt === 2) break;
+        if (e.code === 'truncated' || e.code === 'format') concise = true;
+        else await sleep(1500 * (attempt + 1));
+      }
     }
-  }
-  if (lastError instanceof AIError && lastError.code === 'truncated') {
-    throw new AIError('답변이 너무 길어 잘렸습니다. 문제 하나만 잘라서 다시 시도해 주세요.', 'truncated');
-  }
-  throw lastError instanceof Error ? lastError : new AIError('알 수 없는 오류가 발생했습니다.', 'unknown');
+    if (lastError instanceof AIError && lastError.code === 'truncated') {
+      throw new AIError('답변이 너무 길어 잘렸습니다. 문제 하나만 잘라서 다시 시도해 주세요.', 'truncated');
+    }
+    throw lastError instanceof Error ? lastError : new AIError('알 수 없는 오류가 발생했습니다.', 'unknown');
+  }, (from, to) => onStatus?.(`${PROVIDERS[from].name} 응답에 실패해 ${PROVIDERS[to].name}로 다시 시도하는 중...`));
 }
 
 // ---------- 채점 ----------
@@ -225,9 +267,8 @@ export async function gradeAnswer(
       ? { correct: true, feedback: '정확해요! 잘했어요 👏', byAI: false }
       : { correct: false, feedback: '값이 달라요. 풀이 과정을 다시 확인해 볼까요?', byAI: false };
   }
-  const provider = pickProvider(settings, admin);
-  if (!provider) throw new AIError('자동 채점에는 AI 키가 필요합니다.', 'auth');
-  const r = await run<{ correct: boolean; feedback: string }>(
+  if (providerChain(settings, admin).length === 0) throw new AIError('자동 채점에는 AI 키가 필요합니다.', 'auth');
+  const r = await withFallback(settings, admin, (provider) => run<{ correct: boolean; feedback: string }>(
     { settings, admin, provider, model: PROVIDERS[provider].lightModel },
     {
       system: '당신은 공정한 채점 선생님입니다. JSON 스키마에 맞게 답하세요.',
@@ -236,7 +277,7 @@ export async function gradeAnswer(
       schemaName: 'grade',
       maxTokens: 1500,
     },
-  );
+  ));
   return { correct: !!r.correct, feedback: r.feedback || '', byAI: true };
 }
 
@@ -259,8 +300,7 @@ export async function encryptKeyOnServer(provider: ProviderId, key: string): Pro
 // ---------- 유사 문제 더 만들기 ----------
 
 export async function moreSimilarProblems(analysis: ProblemAnalysis, settings: UserSettings, admin: boolean): Promise<SimilarProblem[]> {
-  const provider = pickProvider(settings, admin);
-  if (!provider) throw new AIError('AI 키가 없습니다. 설정에서 키를 등록해 주세요.', 'auth');
+  return withFallback(settings, admin, async (provider) => {
   const model = settings.models[provider] || PROVIDERS[provider].defaultModel;
   const existing = (analysis.similarProblems || []).map((p) => p.question);
   let lastError: unknown;
@@ -286,6 +326,7 @@ export async function moreSimilarProblems(analysis: ProblemAnalysis, settings: U
     }
   }
   throw lastError instanceof Error ? lastError : new AIError('문제를 만들지 못했습니다.', 'unknown');
+  });
 }
 
 // ---------- 오답 연습 (틀리면 자동으로 같은 유형 3문제) ----------
@@ -297,9 +338,8 @@ export async function practiceFromWrong(
   settings: UserSettings,
   admin: boolean,
 ): Promise<SimilarProblem[]> {
-  const provider = pickProvider(settings, admin);
-  if (!provider) throw new AIError('AI 키가 없습니다.', 'auth');
   const source = analysis.similarProblems[sourceIndex];
+  return withFallback(settings, admin, async (provider) => {
   const existing = new Set((analysis.similarProblems || []).map((p) => p.question.replace(/\s/g, '')));
   let lastError: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -327,4 +367,5 @@ export async function practiceFromWrong(
     }
   }
   throw lastError instanceof Error ? lastError : new AIError('연습 문제를 만들지 못했습니다.', 'unknown');
+  });
 }

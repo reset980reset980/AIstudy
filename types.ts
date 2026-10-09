@@ -103,6 +103,10 @@ export interface UserSettings {
   theme: 'light' | 'dark';
   gradeLevel: string;
   provider: ProviderId;
+  /** 선택한 AI가 실패하면 키가 있는 다른 AI로 자동 재시도 */
+  fallback: boolean;
+  /** 자동 재시도에 Gemini 포함 (선택 사항) */
+  fallbackGemini: boolean;
   models: Record<ProviderId, string>;
   /** 일반 사용자: 본인 Firestore 문서에 저장되는 키 */
   keys: Partial<Record<ProviderId, string>>;

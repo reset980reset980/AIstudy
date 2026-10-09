@@ -207,6 +207,31 @@ const SettingsModal: React.FC<Props> = ({ initial, admin, legacyPlainKeys, onClo
             </div>
           </section>
 
+          {/* 자동 전환 */}
+          <section className="rounded-2xl border border-slate-200 dark:border-slate-600 p-4 space-y-3">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input type="checkbox" checked={s.fallback} onChange={(e) => setS({ ...s, fallback: e.target.checked })} className="mt-1 w-4 h-4 accent-blue-600" />
+              <span>
+                <span className="block font-bold text-slate-800 dark:text-white text-sm">실패하면 다른 AI로 자동 전환</span>
+                <span className="block text-xs text-slate-500 dark:text-slate-400">선택한 AI가 한도 초과·서버 오류로 실패하면 키가 있는 다른 AI(OpenAI ↔ Claude)로 다시 시도해요.</span>
+              </span>
+            </label>
+            <label className={`flex items-start gap-3 pl-7 ${s.fallback ? 'cursor-pointer' : 'opacity-40'}`}>
+              <input type="checkbox" disabled={!s.fallback} checked={s.fallbackGemini} onChange={(e) => setS({ ...s, fallbackGemini: e.target.checked })} className="mt-1 w-4 h-4 accent-blue-600" />
+              <span>
+                <span className="block font-bold text-slate-800 dark:text-white text-sm">Gemini도 포함 (선택)</span>
+                <span className="block text-xs text-slate-500 dark:text-slate-400">켜면 OpenAI·Claude가 모두 실패했을 때 마지막으로 Gemini를 써요.</span>
+              </span>
+            </label>
+            <p className="text-[11px] text-slate-400">
+              시도 순서: {(() => {
+                const order = [s.provider, ...(['openai', 'anthropic', 'gemini'] as ProviderId[]).filter((p) => p !== s.provider)]
+                  .filter((p) => p === s.provider || (s.fallback && (p !== 'gemini' || s.fallbackGemini)));
+                return order.map((p) => PROVIDERS[p].name).join(' → ');
+              })()}
+            </p>
+          </section>
+
           {error && <p className="text-sm text-rose-600 bg-rose-50 dark:bg-rose-900/20 rounded-lg p-3">{error}</p>}
           {!anyKey && <p className="text-xs text-amber-600">키가 하나도 없으면 문제 분석과 자동 채점을 쓸 수 없어요.</p>}
         </div>
