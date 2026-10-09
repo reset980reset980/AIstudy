@@ -124,7 +124,7 @@ export function buildPool(history: ProblemHistoryItem[]): QuizQuestion[] {
         hint: p.hint || '',
         svgCode: p.svgCode || '',
         steps: p.steps || [],
-        sourceTitle: (item.tags || []).slice(0, 2).join(' · ') || item.dateString,
+        sourceTitle: (p.fromWrong !== undefined ? '오답 연습 · ' : '') + ((item.tags || []).slice(0, 2).join(' · ') || item.dateString),
         originalProblemId: item.id,
         index: i,
         tags: item.tags || [],

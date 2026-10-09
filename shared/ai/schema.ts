@@ -152,3 +152,25 @@ ${a.ocrText}
 [이미 낸 유사 문제 — 겹치지 않게]
 ${existing.map((q, i) => `${i + 1}. ${q}`).join('\n')}`;
 }
+
+export function buildPracticePrompt(gradeLevel: string): string {
+  const level = gradeLevel && gradeLevel !== 'auto' ? `학생은 ${gradeLevel}입니다.` : '틀린 문제와 같은 수준으로 만드세요.';
+  return `당신은 친절하고 정확한 'AI 선생님'입니다. ${level}
+학생이 방금 틀린 문제와 같은 유형의 '오답 연습 문제'를 정확히 3개 만드세요.
+- 학생의 오답을 보고 어떤 개념을 헷갈렸는지 짐작해, 그 부분을 연습하게 하세요.
+- 1번은 조금 쉽게, 2번은 비슷하게, 3번은 원래 문제 수준으로 만드세요.
+- 틀린 문제가 객관식이면 연습 문제도 ①②③④ 객관식으로, 주관식이면 주관식으로 만드세요.
+- 정답은 반드시 검산하고, answer는 '12', '3/4', '①'처럼 짧게만 쓰세요.
+- hint에는 헷갈린 부분을 짚는 한 문장을 쓰세요. steps는 2~3단계로 간결하게, 첫 단계에서 정답을 말하지 마세요.
+- 도형이 꼭 필요할 때만 svgCode(viewBox="0 0 300 300"), 아니면 빈 문자열. visualData는 필요 없으면 type NONE.
+모든 내용은 한국어로, 주어진 JSON 스키마를 정확히 따르세요.`;
+}
+
+export function buildPracticeUserText(p: { question: string; answer: string }, wrongAnswer: string, concepts: string[]): string {
+  return `[학생이 틀린 문제]
+${p.question}
+
+[정답] ${p.answer}
+[학생이 쓴 답] ${wrongAnswer}
+[관련 개념] ${concepts.join(', ')}`;
+}

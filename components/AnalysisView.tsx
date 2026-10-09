@@ -19,12 +19,26 @@ interface AnalysisViewProps {
   /** 채점 결과를 학습 이력에 기록 */
   onAttempt?: (index: number, q: SimilarProblem, correct: boolean, answer: string) => void;
   stats?: StatsMap;
+  /** 오답 연습 문제를 만드는 중인 카드 번호 */
+  practicing?: number[];
 }
 
-const AnalysisView: React.FC<AnalysisViewProps> = ({ analysis, originalImageUrl, onReset, onMore, onGrade, onAttempt, stats }) => {
+const AnalysisView: React.FC<AnalysisViewProps> = ({ analysis, originalImageUrl, onReset, onMore, onGrade, onAttempt, stats, practicing = [] }) => {
   const problemId = (analysis as { id?: string }).id;
   const [selectedSimilarProblem, setSelectedSimilarProblem] = useState<SimilarProblem | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+
+  // 원래 유사 문제 뒤에 그 문제에서 만든 오답 연습 문제를 이어서 보여 줌 (배열 순서·번호는 그대로 유지)
+  const allSimilar = analysis.similarProblems || [];
+  const numberOf = new Map<number, number>();
+  allSimilar.forEach((p, i) => { if (p.fromWrong === undefined) numberOf.set(i, numberOf.size + 1); });
+  const display: { prob: SimilarProblem; idx: number; loading?: boolean }[] = [];
+  allSimilar.forEach((p, i) => {
+    if (p.fromWrong !== undefined) return;
+    display.push({ prob: p, idx: i });
+    allSimilar.forEach((c, j) => { if (c.fromWrong === i) display.push({ prob: c, idx: j }); });
+    if (practicing.includes(i)) display.push({ prob: p, idx: i, loading: true });
+  });
   const handleMore = async () => {
     if (!onMore) return;
     setLoadingMore(true);
@@ -180,10 +194,20 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ analysis, originalImageUrl,
             <span className="text-2xl">🎯</span> 유사 문제 풀어보기
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {(analysis.similarProblems || []).map((prob, idx) => (
-                <div key={idx} className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700 hover:shadow-md transition-all flex flex-col">
+            {display.map(({ prob, idx, loading }) => loading ? (
+                <div key={`loading-${idx}`} className="rounded-xl p-6 border-2 border-dashed border-orange-200 dark:border-orange-900/50 bg-orange-50/50 dark:bg-orange-900/10 flex flex-col items-center justify-center text-center min-h-[200px] animate-fade-in">
+                    <Loader2 size={28} className="animate-spin text-orange-400 mb-3" />
+                    <p className="text-sm font-bold text-orange-600 dark:text-orange-400">🔁 문제 {numberOf.get(idx)}와 비슷한 연습 문제를 만드는 중...</p>
+                    <p className="text-xs text-slate-400 mt-1">틀린 부분을 다시 연습할 수 있게 3문제를 준비하고 있어요</p>
+                </div>
+            ) : (
+                <div key={idx} className={`bg-white dark:bg-slate-800 rounded-xl p-6 border hover:shadow-md transition-all flex flex-col ${prob.fromWrong !== undefined ? 'border-orange-200 dark:border-orange-900/50 animate-fade-in' : 'border-slate-200 dark:border-slate-700'}`}>
                     <div className="flex justify-between items-center mb-4">
-                        <span className="bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 text-xs font-bold px-2 py-1 rounded">문제 {idx + 1}</span>
+                        {prob.fromWrong !== undefined ? (
+                          <span className="bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 text-[11px] font-bold px-2 py-1 rounded">🔁 문제 {numberOf.get(prob.fromWrong)} 오답 연습</span>
+                        ) : (
+                          <span className="bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 text-xs font-bold px-2 py-1 rounded">문제 {numberOf.get(idx)}</span>
+                        )}
                     </div>
                     
                     {/* Visual Area - Renders ONLY if svgCode exists */}
@@ -255,7 +279,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ analysis, originalImageUrl,
             {loadingMore ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}
             {loadingMore ? 'AI가 새 문제를 만드는 중...' : '다른 문제 더 풀어보기'}
           </button>
-          <p className="text-xs text-slate-400">같은 개념으로 새 문제 3개를 더 만들어요. 시험 탭에도 함께 출제돼요.</p>
+          <p className="text-xs text-slate-400">같은 개념으로 새 문제 3개를 더 만들어요. 카드에서 틀리면 비슷한 연습 문제 3개가 자동으로 생겨요.</p>
         </div>
       )}
 

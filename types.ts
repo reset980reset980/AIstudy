@@ -30,6 +30,8 @@ export interface SimilarProblem {
   hint: string;
   svgCode?: string;
   steps: SolutionStep[];
+  /** 틀린 문제(이 배열의 인덱스)에서 자동으로 만든 오답 연습 문제 */
+  fromWrong?: number;
 }
 
 export const SUBJECTS = ['수학', '과학', '사회', '국어', '영어', '기타'] as const;

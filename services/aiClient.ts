@@ -4,7 +4,7 @@
 
 import { auth } from '../firebase';
 import { PROVIDERS, PROVIDER_ORDER, type ProviderId } from '../shared/ai/models';
-import { analysisSchema, buildAnalysisPrompt, buildGradePrompt, buildMoreSimilarPrompt, buildMoreSimilarUserText, gradeSchema, moreSimilarSchema } from '../shared/ai/schema';
+import { analysisSchema, buildAnalysisPrompt, buildGradePrompt, buildMoreSimilarPrompt, buildMoreSimilarUserText, buildPracticePrompt, buildPracticeUserText, gradeSchema, moreSimilarSchema } from '../shared/ai/schema';
 import { AIError, generateStructured, testApiKey, type FileInput, type StructuredRequest } from '../shared/ai/providers';
 import type { ProblemAnalysis, SimilarProblem, UserSettings } from '../types';
 import { answerChoice, getChoices } from './learning';
@@ -19,7 +19,7 @@ export function defaultSettings(): UserSettings {
   return {
     theme: 'light',
     gradeLevel: 'auto',
-    provider: 'gemini',
+    provider: 'anthropic', // 가성비 기본값: Claude Haiku 5.5
     models: {
       gemini: PROVIDERS.gemini.defaultModel,
       openai: PROVIDERS.openai.defaultModel,
@@ -286,4 +286,45 @@ export async function moreSimilarProblems(analysis: ProblemAnalysis, settings: U
     }
   }
   throw lastError instanceof Error ? lastError : new AIError('문제를 만들지 못했습니다.', 'unknown');
+}
+
+// ---------- 오답 연습 (틀리면 자동으로 같은 유형 3문제) ----------
+
+export async function practiceFromWrong(
+  analysis: ProblemAnalysis,
+  sourceIndex: number,
+  wrongAnswer: string,
+  settings: UserSettings,
+  admin: boolean,
+): Promise<SimilarProblem[]> {
+  const provider = pickProvider(settings, admin);
+  if (!provider) throw new AIError('AI 키가 없습니다.', 'auth');
+  const source = analysis.similarProblems[sourceIndex];
+  const existing = new Set((analysis.similarProblems || []).map((p) => p.question.replace(/\s/g, '')));
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const r = await run<{ similarProblems: SimilarProblem[] }>(
+        // 비용 절약: 각 AI의 가장 저렴한 모델 사용
+        { settings, admin, provider, model: PROVIDERS[provider].lightModel },
+        {
+          system: buildPracticePrompt(settings.gradeLevel),
+          userText: buildPracticeUserText(source, wrongAnswer, analysis.tags || []),
+          schema: moreSimilarSchema,
+          schemaName: 'practice',
+          maxTokens: 8000,
+        },
+      );
+      const fixed = normalizeAnalysis({ ...analysis, similarProblems: r.similarProblems || [] }).similarProblems;
+      return fixed
+        .filter((p) => p.question && p.answer && !existing.has(p.question.replace(/\s/g, '')))
+        .slice(0, 3)
+        .map((p) => ({ ...p, fromWrong: sourceIndex }));
+    } catch (e) {
+      lastError = e;
+      if (!(e instanceof AIError) || !e.retryable) break;
+      await sleep(1500);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new AIError('연습 문제를 만들지 못했습니다.', 'unknown');
 }

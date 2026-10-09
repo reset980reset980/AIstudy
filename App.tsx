@@ -1,11 +1,11 @@
-import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { CircleAlert, Home, History, GraduationCap, LogIn, LogOut, User, Settings, BrainCircuit, ScanLine, Sparkles, ShieldCheck, Loader2 } from 'lucide-react';
 import { onAuthStateChanged, signOut, getRedirectResult, type User as FirebaseUser } from 'firebase/auth';
 import { auth } from './firebase';
 import UploadView from './components/UploadView';
 import LoginModal from './components/LoginModal';
 import { ToastProvider, useToast } from './components/Toast';
-import { analyzeProblem, defaultSettings, gradeAnswer, isAdminUser, moreSimilarProblems, pickProvider } from './services/aiClient';
+import { analyzeProblem, defaultSettings, gradeAnswer, isAdminUser, moreSimilarProblems, pickProvider, practiceFromWrong } from './services/aiClient';
 import { applyAttempt, fetchStats, saveStat, statKey, type StatsMap } from './services/learning';
 import { addHistory, deleteHistory, fetchHistory, loadSettings, saveSettings, updateProblemMeta, updateSimilarProblems } from './services/userData';
 import { PROVIDERS } from './shared/ai/models';
@@ -93,11 +93,14 @@ const AppInner: React.FC = () => {
   const [finalImageUrl, setFinalImageUrl] = useState<string | null>(null);
   const [history, setHistory] = useState<ProblemHistoryItem[]>([]);
   const [stats, setStats] = useState<StatsMap>({});
+  const [practicing, setPracticing] = useState<number[]>([]); // 오답 연습 문제를 만드는 중인 카드
+  const dataRef = useRef<AnalysisState['data']>(null);
 
   const [settings, setSettings] = useState<UserSettings>(() => ({ ...defaultSettings(), theme: initialTheme() }));
   const [legacyPlainKeys, setLegacyPlainKeys] = useState(false);
 
   const admin = isAdminUser(user?.email, user?.emailVerified);
+  dataRef.current = state.data;
   const activeProvider = pickProvider(settings, admin);
 
   useEffect(() => {
@@ -150,6 +153,7 @@ const AppInner: React.FC = () => {
   }, []);
 
   const handleReset = () => {
+    setPracticing([]);
     setState({ isLoading: false, data: null, error: null });
     clearImages();
   };
@@ -203,13 +207,7 @@ const AppInner: React.FC = () => {
     try {
       const added = await moreSimilarProblems(current, settings, admin);
       if (added.length === 0) { toast('새 문제를 만들지 못했어요. 다시 눌러 주세요.', 'error'); return; }
-      const merged = [...(current.similarProblems || []), ...added];
-      const id = (current as Partial<ProblemHistoryItem>).id;
-      setState((st) => (st.data ? { ...st, data: { ...st.data, similarProblems: merged } } : st));
-      if (id) {
-        setHistory((h) => h.map((x) => (x.id === id ? { ...x, similarProblems: merged } : x)));
-        updateSimilarProblems(id, merged).catch((e) => { console.error(e); toast('새 문제를 기록에 저장하지 못했습니다.', 'error'); });
-      }
+      commitSimilar([...(dataRef.current?.similarProblems || []), ...added]);
       toast(`새 문제 ${added.length}개를 만들었어요!`, 'success');
     } catch (e: any) {
       toast(e?.message || '새 문제를 만들지 못했습니다.', 'error');
@@ -230,10 +228,37 @@ const AppInner: React.FC = () => {
     });
   };
 
+  /** 유사 문제 목록을 화면·기록·저장소에 함께 반영 */
+  const commitSimilar = (merged: SimilarProblem[]) => {
+    const current = dataRef.current;
+    if (!current) return;
+    const id = (current as Partial<ProblemHistoryItem>).id;
+    dataRef.current = { ...current, similarProblems: merged };
+    setState((st) => (st.data ? { ...st, data: { ...st.data, similarProblems: merged } } : st));
+    if (id) {
+      setHistory((h) => h.map((x) => (x.id === id ? { ...x, similarProblems: merged } : x)));
+      updateSimilarProblems(id, merged).catch((e) => { console.error(e); toast('새 문제를 기록에 저장하지 못했습니다.', 'error'); });
+    }
+  };
+
   const handleCardAttempt = (index: number, q: SimilarProblem, correct: boolean, answer: string) => {
-    const id = (state.data as Partial<ProblemHistoryItem> | null)?.id;
-    if (!id) return;
-    recordAttempt({ problemId: id, index, question: q.question, tags: state.data?.tags || [] }, correct, answer);
+    const current = dataRef.current;
+    const id = (current as Partial<ProblemHistoryItem> | null)?.id;
+    if (id) recordAttempt({ problemId: id, index, question: q.question, tags: current?.tags || [] }, correct, answer);
+
+    // 틀리면 같은 유형 3문제 자동 생성 (원래 문제당 한 번, 연습 문제에서는 다시 만들지 않음)
+    if (correct || !current || !activeProvider || q.fromWrong !== undefined) return;
+    if (current.similarProblems.some((p) => p.fromWrong === index) || practicing.includes(index)) return;
+    setPracticing((list) => [...list, index]);
+    practiceFromWrong(current, index, answer, settings, admin)
+      .then((added) => {
+        // 그사이 다른 문제로 이동했으면 반영하지 않음
+        if (added.length === 0 || !dataRef.current || dataRef.current.ocrText !== current.ocrText) return;
+        commitSimilar([...(dataRef.current.similarProblems || []), ...added]);
+        toast(`틀린 문제와 비슷한 연습 문제 ${added.length}개를 만들었어요`, 'info');
+      })
+      .catch((e) => toast(e?.message || '오답 연습 문제를 만들지 못했습니다.', 'error'))
+      .finally(() => setPracticing((list) => list.filter((i) => i !== index)));
   };
 
   const handleQuizRecord = (q: QuizQuestion, correct: boolean, answer: string) =>
@@ -272,7 +297,7 @@ const AppInner: React.FC = () => {
   else if (!user) home = <WelcomeView onLogin={() => setShowLogin(true)} />;
   else if (state.isLoading) home = <UploadView onFileSelect={() => {}} isLoading statusMessage={statusMessage} />;
   else if (rawImageUrl) home = <ProblemSelector imageUrl={rawImageUrl} onConfirm={handleCropConfirm} onCancel={clearImages} />;
-  else if (state.data) home = <AnalysisView analysis={state.data} originalImageUrl={finalImageUrl} onReset={handleReset} onMore={user && activeProvider ? handleMoreSimilar : undefined} onGrade={user ? grade : undefined} onAttempt={handleCardAttempt} stats={stats} />;
+  else if (state.data) home = <AnalysisView analysis={state.data} originalImageUrl={finalImageUrl} onReset={handleReset} onMore={user && activeProvider ? handleMoreSimilar : undefined} onGrade={user ? grade : undefined} onAttempt={handleCardAttempt} stats={stats} practicing={practicing} />;
   else home = (
     <UploadView
       onFileSelect={handleFileSelect}
