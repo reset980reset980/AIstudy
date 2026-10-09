@@ -1,7 +1,5 @@
 {
-  "name": "MathMate AI(Vercel배포용)",
-  "description": "An AI-powered wrong-answer notebook and personalized math learning system that breaks down problems step-by-step.",
-  "requestFramePermissions": [
-    "camera"
-  ]
+  "name": "스마트 스터디 AI",
+  "description": "문제를 찍어 올리면 AI가 단계별 풀이·유사 문제·자동 채점 시험을 제공하는 학습 도우미 (Gemini·OpenAI·Claude 지원)",
+  "requestFramePermissions": ["camera"]
 }

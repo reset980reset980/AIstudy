@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { ProblemAnalysis, SimilarProblem } from '../types';
 import StepVisual from './StepVisual';
+import SafeSvg from './SafeSvg';
+import { PROVIDERS } from '../shared/ai/models';
 import { CheckCircle, BookOpen, Lightbulb, ArrowRight, RefreshCw, Triangle, X, MonitorPlay, Maximize2 } from 'lucide-react';
 
 interface AnalysisViewProps {
@@ -13,7 +15,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ analysis, originalImageUrl,
   const [selectedSimilarProblem, setSelectedSimilarProblem] = useState<SimilarProblem | null>(null);
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-4 space-y-8 animate-fade-in pb-20">
+    <div className="w-full max-w-7xl mx-auto sm:p-4 space-y-8 animate-fade-in pb-20">
       
       {/* Header / Summary Card */}
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 relative overflow-hidden transition-colors">
@@ -35,7 +37,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ analysis, originalImageUrl,
                    <BookOpen size={16} /> 필요한 지식
                 </h3>
                 <ul className="text-slate-700 dark:text-slate-300 text-sm list-disc list-inside">
-                  {analysis.requiredKnowledge.map((k, i) => <li key={i}>{k}</li>)}
+                  {(analysis.requiredKnowledge || []).map((k, i) => <li key={i}>{k}</li>)}
                 </ul>
               </div>
               <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-xl border border-purple-100 dark:border-purple-900">
@@ -44,9 +46,9 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ analysis, originalImageUrl,
                 </h3>
                 <div className="flex flex-wrap gap-2">
                     <span className="px-2 py-1 bg-white dark:bg-slate-700 rounded-md text-xs font-medium text-slate-600 dark:text-slate-200 border border-purple-100 dark:border-purple-800">
-                        {analysis.difficulty}
+                        난이도 {analysis.difficulty}
                     </span>
-                    {analysis.tags.map(t => (
+                    {(analysis.tags || []).map(t => (
                         <span key={t} className="px-2 py-1 bg-white dark:bg-slate-700 rounded-md text-xs font-medium text-slate-600 dark:text-slate-200 border border-purple-100 dark:border-purple-800">
                             #{t}
                         </span>
@@ -61,13 +63,13 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ analysis, originalImageUrl,
       {/* Steps Horizontal Scroll */}
       <div className="relative">
          <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-            <span className="text-2xl">📝</span> 도리 선생님의 문제 풀이 노트
+            <span className="text-2xl">📝</span> AI 선생님의 풀이 노트
          </h3>
          
          <div className="flex gap-6 overflow-x-auto pb-8 horizontal-scroll snap-x">
             
             {/* Original Problem Card */}
-            <div className="min-w-[320px] max-w-[320px] bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 snap-center flex flex-col">
+            <div className="w-[85vw] max-w-[320px] shrink-0 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 snap-center flex flex-col">
                 <div className="border-b border-slate-100 dark:border-slate-700 pb-3 mb-3">
                     <span className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide">원본 문제</span>
                 </div>
@@ -85,7 +87,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ analysis, originalImageUrl,
 
             {/* Dynamic Steps */}
             {analysis.steps.map((step, index) => (
-                <div key={index} className="min-w-[350px] max-w-[350px] bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-blue-100 dark:border-slate-700 p-5 snap-center flex flex-col relative">
+                <div key={index} className="w-[85vw] max-w-[350px] shrink-0 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-blue-100 dark:border-slate-700 p-5 snap-center flex flex-col relative">
                     <div className="absolute -right-3 top-1/2 transform -translate-y-1/2 z-10 hidden md:block">
                          {index < analysis.steps.length - 1 && <ArrowRight className="text-slate-300 dark:text-slate-600" />}
                     </div>
@@ -132,7 +134,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ analysis, originalImageUrl,
             ))}
 
             {/* Final Answer Card */}
-            <div className="min-w-[320px] max-w-[320px] bg-gradient-to-b from-red-50 to-white dark:from-red-900/10 dark:to-slate-800 rounded-2xl shadow-sm border border-red-100 dark:border-red-900/30 p-5 snap-center flex flex-col justify-center items-center text-center">
+            <div className="w-[85vw] max-w-[320px] shrink-0 bg-gradient-to-b from-red-50 to-white dark:from-red-900/10 dark:to-slate-800 rounded-2xl shadow-sm border border-red-100 dark:border-red-900/30 p-5 snap-center flex flex-col justify-center items-center text-center">
                  <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-4 text-red-500 dark:text-red-400">
                     <CheckCircle size={32} />
                  </div>
@@ -140,9 +142,12 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ analysis, originalImageUrl,
                  <div className="text-4xl font-extrabold text-red-500 dark:text-red-400 handwritten">
                     {analysis.finalAnswer}
                  </div>
-                 <div className="mt-8 text-sm text-slate-500 dark:text-slate-400 font-medium bg-white dark:bg-slate-700 px-4 py-2 rounded-full border border-red-100 dark:border-red-900/30 shadow-sm">
-                    참 잘했어요! 👏
-                 </div>
+                 {analysis.aiProvider && (
+                   <div className="mt-8 text-xs text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-700 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-600">
+                      {PROVIDERS[analysis.aiProvider]?.name} · {analysis.aiModel}
+                   </div>
+                 )}
+                 <p className="mt-3 text-[11px] text-slate-400">AI 풀이는 틀릴 수 있어요. 꼭 직접 확인해 보세요.</p>
             </div>
          </div>
       </div>
@@ -153,7 +158,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ analysis, originalImageUrl,
             <span className="text-2xl">🎯</span> 유사 문제 풀어보기
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {analysis.similarProblems.map((prob, idx) => (
+            {(analysis.similarProblems || []).map((prob, idx) => (
                 <div key={idx} className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700 hover:shadow-md transition-all flex flex-col">
                     <div className="flex justify-between items-center mb-4">
                         <span className="bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 text-xs font-bold px-2 py-1 rounded">문제 {idx + 1}</span>
@@ -162,14 +167,11 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ analysis, originalImageUrl,
                     {/* Visual Area - Renders ONLY if svgCode exists */}
                     {prob.svgCode ? (
                         <div 
-                            className="w-full aspect-square bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-700 mb-4 cursor-pointer hover:border-blue-300 dark:hover:border-blue-700 transition-colors relative group"
+                            className="w-full aspect-square bg-white rounded-lg border border-slate-200 dark:border-slate-600 mb-4 cursor-pointer hover:border-blue-300 dark:hover:border-blue-700 transition-colors relative group"
                             onClick={() => setSelectedSimilarProblem(prob)}
                         >
                              <div className="absolute inset-0 flex items-center justify-center p-2">
-                                <div 
-                                    className="w-full h-full [&>svg]:w-full [&>svg]:h-full object-contain" 
-                                    dangerouslySetInnerHTML={{ __html: prob.svgCode }} 
-                                />
+                                <SafeSvg svg={prob.svgCode} />
                              </div>
                              <div className="absolute inset-0 bg-black/5 dark:bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg pointer-events-none">
                                 <Maximize2 className="text-slate-600 dark:text-slate-300 bg-white/80 dark:bg-slate-800/80 p-1.5 rounded-full" size={28} />
@@ -215,8 +217,8 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ analysis, originalImageUrl,
 
       {/* Solution Modal */}
       {selectedSimilarProblem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setSelectedSimilarProblem(null)}>
+            <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
                 {/* Modal Header */}
                 <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800">
                     <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
@@ -237,11 +239,8 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ analysis, originalImageUrl,
                         <div className="flex flex-col md:flex-row gap-6">
                             {selectedSimilarProblem.svgCode && (
                                 /* Modal Image - Renders only if exists */
-                                <div className="w-full md:w-1/2 max-w-[320px] aspect-square bg-slate-50 dark:bg-slate-900 rounded-lg flex items-center justify-center p-4 border border-slate-100 dark:border-slate-700 mx-auto md:mx-0">
-                                     <div 
-                                        className="w-full h-full [&>svg]:w-full [&>svg]:h-full object-contain"
-                                        dangerouslySetInnerHTML={{ __html: selectedSimilarProblem.svgCode }} 
-                                    />
+                                <div className="w-full md:w-1/2 max-w-[320px] aspect-square bg-white rounded-lg flex items-center justify-center p-4 border border-slate-200 dark:border-slate-600 mx-auto md:mx-0">
+                                     <SafeSvg svg={selectedSimilarProblem.svgCode} />
                                 </div>
                             )}
                             <div className="flex-1 flex flex-col justify-center">

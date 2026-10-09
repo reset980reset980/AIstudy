@@ -69,11 +69,11 @@ const ProblemSelector: React.FC<ProblemSelectorProps> = ({ imageUrl, onConfirm, 
   };
 
   const handleCropAndConfirm = async () => {
-    if (!imgRef.current || !selection || selection.w === 0 || selection.h === 0) {
-        // If no selection, use full image
+    if (!imgRef.current || !selection || selection.w < 10 || selection.h < 10) {
+        // 선택 영역이 없거나 너무 작으면 사진 전체 사용
         const response = await fetch(imageUrl);
         const blob = await response.blob();
-        const file = new File([blob], "full_image.jpg", { type: "image/jpeg" });
+        const file = new File([blob], "full_image", { type: blob.type || "image/jpeg" });
         onConfirm(file);
         return;
     }
@@ -109,8 +109,8 @@ const ProblemSelector: React.FC<ProblemSelectorProps> = ({ imageUrl, onConfirm, 
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-100px)] animate-fade-in p-4">
-      <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 max-w-4xl w-full">
+    <div className="flex flex-col items-center justify-center animate-fade-in sm:p-4">
+      <div className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 max-w-4xl w-full">
         <div className="text-center mb-6">
             <h2 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center justify-center gap-2">
                 <Crop className="text-blue-500" />
@@ -194,7 +194,7 @@ const ProblemSelector: React.FC<ProblemSelectorProps> = ({ imageUrl, onConfirm, 
                 className="px-8 py-3 rounded-xl font-bold text-white bg-blue-500 hover:bg-blue-600 shadow-md hover:shadow-lg transition-all flex items-center gap-2"
             >
                 <Check size={20} /> 
-                {(!selection || (selection.w === 0)) ? '전체 선택' : '선택 완료'}
+                {(!selection || selection.w < 10 || selection.h < 10) ? '사진 전체로 분석' : '선택 영역 분석'}
             </button>
         </div>
       </div>

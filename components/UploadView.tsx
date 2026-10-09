@@ -1,12 +1,15 @@
-import React, { useCallback, useState, useRef } from 'react';
+import React, { useCallback, useState, useRef, useEffect } from 'react';
 import { Upload, Camera, BrainCircuit, PenTool, X, SwitchCamera, Aperture } from 'lucide-react';
 
 interface UploadViewProps {
   onFileSelect: (file: File) => void;
   isLoading: boolean;
+  statusMessage?: string;
+  providerName?: string;
+  onOpenSettings?: () => void;
 }
 
-const UploadView: React.FC<UploadViewProps> = ({ onFileSelect, isLoading }) => {
+const UploadView: React.FC<UploadViewProps> = ({ onFileSelect, isLoading, statusMessage, providerName, onOpenSettings }) => {
   const [isCameraMode, setIsCameraMode] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -14,12 +17,12 @@ const UploadView: React.FC<UploadViewProps> = ({ onFileSelect, isLoading }) => {
   const streamRef = useRef<MediaStream | null>(null);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
 
-  const startCamera = async () => {
+  const startCamera = async (mode: 'user' | 'environment' = facingMode) => {
     setIsCameraMode(true);
     setCameraError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: facingMode }
+        video: { facingMode: mode, width: { ideal: 1920 }, height: { ideal: 1080 } }
       });
       streamRef.current = stream;
       if (videoRef.current) {
@@ -43,8 +46,9 @@ const UploadView: React.FC<UploadViewProps> = ({ onFileSelect, isLoading }) => {
     if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
     }
-    setFacingMode(prev => prev === 'user' ? 'environment' : 'user');
-    setTimeout(() => startCamera(), 100); 
+    const nextMode = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(nextMode);
+    setTimeout(() => startCamera(nextMode), 100);
   };
 
   const capturePhoto = () => {
@@ -67,6 +71,9 @@ const UploadView: React.FC<UploadViewProps> = ({ onFileSelect, isLoading }) => {
     }
   };
 
+  // 화면을 떠날 때 카메라 끄기
+  useEffect(() => () => { streamRef.current?.getTracks().forEach(t => t.stop()); }, []);
+
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
@@ -81,6 +88,7 @@ const UploadView: React.FC<UploadViewProps> = ({ onFileSelect, isLoading }) => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       onFileSelect(e.target.files[0]);
+      e.target.value = ''; // 같은 파일을 다시 골라도 동작하도록
     }
   };
 
@@ -131,9 +139,9 @@ const UploadView: React.FC<UploadViewProps> = ({ onFileSelect, isLoading }) => {
   }
 
   return (
-    <div className="max-w-2xl mx-auto mt-12 p-4 animate-fade-in">
+    <div className="max-w-2xl mx-auto mt-6 sm:mt-12 animate-fade-in">
       <div className="text-center mb-10">
-        <h1 className="text-4xl font-extrabold text-slate-800 dark:text-white mb-4 tracking-tight">
+        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-800 dark:text-white mb-4 tracking-tight">
           스마트 스터디 <span className="text-blue-500">AI</span>
         </h1>
         <p className="text-slate-500 dark:text-slate-400 text-lg">
@@ -142,12 +150,20 @@ const UploadView: React.FC<UploadViewProps> = ({ onFileSelect, isLoading }) => {
         </p>
       </div>
 
+      {!isLoading && onOpenSettings && (
+        <div className="flex justify-center mb-6">
+          <button onClick={onOpenSettings} className={`text-xs font-medium px-3 py-1.5 rounded-full border ${providerName ? 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800' : 'border-amber-300 text-amber-700 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400'}`}>
+            {providerName ? `사용 중인 AI: ${providerName} · 바꾸기` : '⚠️ AI 키가 없어요 · 설정에서 등록하기'}
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
           <div
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
             className={`
-              relative border-2 border-dashed rounded-3xl p-8 text-center transition-all duration-300 flex flex-col items-center justify-center min-h-[240px]
+              relative border-2 border-dashed rounded-3xl p-8 text-center transition-all duration-300 flex flex-col items-center justify-center min-h-[180px] sm:min-h-[240px]
               ${isLoading 
                 ? 'border-blue-300 bg-blue-50 dark:bg-blue-900/20 cursor-wait' 
                 : 'border-slate-300 dark:border-slate-600 hover:border-blue-400 hover:bg-white dark:hover:bg-slate-800 bg-slate-50 dark:bg-slate-800 cursor-pointer shadow-sm hover:shadow-md'
@@ -159,13 +175,14 @@ const UploadView: React.FC<UploadViewProps> = ({ onFileSelect, isLoading }) => {
               id="file-upload"
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-10"
               onChange={handleChange}
-              accept="image/*, .pdf, .hwp, .pptx, .ppt"
+              accept="image/*,.pdf,application/pdf"
               disabled={isLoading}
             />
             {isLoading ? (
                 <div className="flex flex-col items-center">
                    <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
-                   <p className="text-blue-600 dark:text-blue-400 font-semibold animate-pulse">분석 중...</p>
+                   <p className="text-blue-600 dark:text-blue-400 font-semibold animate-pulse">{statusMessage || '분석 중...'}</p>
+                   <p className="text-xs text-slate-400 mt-2">보통 20~60초 정도 걸려요</p>
                 </div>
             ) : (
                 <>
@@ -173,15 +190,15 @@ const UploadView: React.FC<UploadViewProps> = ({ onFileSelect, isLoading }) => {
                      <Upload size={28} />
                    </div>
                    <p className="font-bold text-slate-700 dark:text-white text-lg">파일 업로드</p>
-                   <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">이미지, PDF, 문서 지원</p>
+                   <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">사진(JPG·PNG) 또는 PDF</p>
                 </>
             )}
           </div>
 
           <button
-            onClick={startCamera}
+            onClick={() => startCamera()}
             disabled={isLoading}
-            className="border-2 border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 hover:bg-white dark:hover:bg-slate-700 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md rounded-3xl p-8 flex flex-col items-center justify-center min-h-[240px] transition-all duration-300 group"
+            className="border-2 border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 hover:bg-white dark:hover:bg-slate-700 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md rounded-3xl p-8 flex flex-col items-center justify-center min-h-[180px] sm:min-h-[240px] transition-all duration-300 group"
           >
              <div className="w-16 h-16 bg-white dark:bg-slate-700 rounded-full flex items-center justify-center shadow-sm text-purple-500 dark:text-purple-400 mb-4 group-hover:scale-110 transition-transform">
                 <Camera size={28} />

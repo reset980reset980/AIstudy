@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+/* 다크 모드: <html class="dark"> 기준 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Noto Sans KR", ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+  word-break: keep-all; /* 한국어 단어 중간 줄바꿈 방지 */
+  overflow-wrap: anywhere;
+}
+
+.handwritten {
+  font-family: "Nanum Pen Script", cursive;
+}
+
+button:not(:disabled), [role="button"] {
+  cursor: pointer;
+}
+
+/* 가로 스크롤 막대 */
+.horizontal-scroll::-webkit-scrollbar { height: 8px; }
+.horizontal-scroll::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+.dark .horizontal-scroll::-webkit-scrollbar-track { background: #1e293b; }
+.horizontal-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+.dark .horizontal-scroll::-webkit-scrollbar-thumb { background: #475569; }
+
+.animate-fade-in { animation: fadeIn 0.4s ease-out both; }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in, .animate-spin, .animate-pulse { animation: none; }
+}

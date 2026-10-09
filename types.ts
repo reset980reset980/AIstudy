@@ -1,9 +1,17 @@
+import type { ProviderId } from './shared/ai/models';
+
 export enum DiagramType {
   BAR = 'BAR',
   PIE = 'PIE',
   NUMBER_LINE = 'NUMBER_LINE',
-  GEOMETRY = 'GEOMETRY', // New type for geometry
-  NONE = 'NONE'
+  GEOMETRY = 'GEOMETRY',
+  NONE = 'NONE',
+}
+
+export interface VisualData {
+  type: DiagramType | string;
+  data?: { name: string; value: number }[];
+  svgCode?: string;
 }
 
 export interface SolutionStep {
@@ -11,34 +19,31 @@ export interface SolutionStep {
   title: string;
   description: string;
   equation: string;
-  tip: string; 
-  mathPrinciple: string; // The underlying mathematical principle
-  visualData?: {
-    type: DiagramType;
-    data?: any[]; // For charts
-    svgCode?: string; // New field for raw SVG string
-    dataKey?: string;
-    labelKey?: string;
-  };
+  tip: string;
+  mathPrinciple: string;
+  visualData?: VisualData | null;
 }
 
 export interface SimilarProblem {
   question: string;
   answer: string;
   hint: string;
-  svgCode?: string; // Visual for similar problem
-  steps: SolutionStep[]; // Full step-by-step solution for the similar problem
+  svgCode?: string;
+  steps: SolutionStep[];
 }
 
 export interface ProblemAnalysis {
   ocrText: string;
-  tags: string[]; 
-  difficulty: string; 
-  goal: string; 
+  tags: string[];
+  difficulty: string;
+  goal: string;
   requiredKnowledge: string[];
   steps: SolutionStep[];
   finalAnswer: string;
   similarProblems: SimilarProblem[];
+  /** 분석에 사용한 AI (새 기록부터 저장) */
+  aiProvider?: ProviderId;
+  aiModel?: string;
 }
 
 export interface AnalysisState {
@@ -47,20 +52,48 @@ export interface AnalysisState {
   error: string | null;
 }
 
-// Firebase History Item
 export interface ProblemHistoryItem extends ProblemAnalysis {
   id: string;
   userId: string;
-  timestamp: number; // Unix timestamp
-  dateString: string; // Readable date
+  timestamp: number;
+  dateString: string;
 }
 
-// Quiz Types
+// 시험
 export interface QuizQuestion {
   id: string;
   question: string;
   answer: string;
-  isCorrect?: boolean;
-  userAnswer?: string;
+  hint: string;
+  svgCode?: string;
+  steps: SolutionStep[];
+  sourceTitle: string;
   originalProblemId: string;
+  userAnswer?: string;
+  isCorrect?: boolean;
+  feedback?: string;
+}
+
+export interface QuizResult {
+  id?: string;
+  timestamp: number;
+  total: number;
+  correct: number;
+}
+
+// 사용자 설정
+export interface EncryptedKey {
+  cipher: string;
+  last4: string;
+}
+
+export interface UserSettings {
+  theme: 'light' | 'dark';
+  gradeLevel: string;
+  provider: ProviderId;
+  models: Record<ProviderId, string>;
+  /** 일반 사용자: 본인 Firestore 문서에 저장되는 키 */
+  keys: Partial<Record<ProviderId, string>>;
+  /** 관리자: 서버에서 암호화된 키 (평문 저장 안 함) */
+  encKeys: Partial<Record<ProviderId, EncryptedKey>>;
 }

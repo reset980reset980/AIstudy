@@ -1,24 +1,32 @@
 {
-  "name": "mathmate-ai(vercel배포용)",
+  "name": "smart-study-ai",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:api": "esbuild server/ai.ts --bundle --platform=node --format=esm --target=node20 --outfile=api/ai.js --banner:js=\"// 자동 생성 파일입니다. server/ai.ts를 고친 뒤 npm run build:api 로 다시 만드세요.\"",
+    "typecheck": "tsc --noEmit",
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/genai": "^1.30.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "lucide-react": "^0.555.0",
-    "recharts": "^3.5.0",
-    "firebase": "^12.6.0"
+    "dompurify": "^3.4.16",
+    "firebase": "^13.0.0",
+    "lucide-react": "^1.54.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "recharts": "^3.10.1"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/dompurify": "^3.0.5",
     "@types/node": "^22.14.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "esbuild": "^0.28.2",
+    "tailwindcss": "^4.3.3",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }
