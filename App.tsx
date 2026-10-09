@@ -5,10 +5,11 @@ import { auth } from './firebase';
 import UploadView from './components/UploadView';
 import LoginModal from './components/LoginModal';
 import { ToastProvider, useToast } from './components/Toast';
-import { analyzeProblem, defaultSettings, isAdminUser, moreSimilarProblems, pickProvider } from './services/aiClient';
-import { addHistory, deleteHistory, fetchHistory, loadSettings, saveSettings, updateSimilarProblems } from './services/userData';
+import { analyzeProblem, defaultSettings, gradeAnswer, isAdminUser, moreSimilarProblems, pickProvider } from './services/aiClient';
+import { applyAttempt, fetchStats, saveStat, statKey, type StatsMap } from './services/learning';
+import { addHistory, deleteHistory, fetchHistory, loadSettings, saveSettings, updateProblemMeta, updateSimilarProblems } from './services/userData';
 import { PROVIDERS } from './shared/ai/models';
-import type { AnalysisState, ProblemHistoryItem, UserSettings } from './types';
+import type { AnalysisState, ProblemHistoryItem, QuizQuestion, SimilarProblem, UserSettings } from './types';
 
 // 큰 화면은 필요할 때만 불러와 첫 화면을 빠르게
 const AnalysisView = lazy(() => import('./components/AnalysisView'));
@@ -91,6 +92,7 @@ const AppInner: React.FC = () => {
   const [rawImageUrl, setRawImageUrl] = useState<string | null>(null);
   const [finalImageUrl, setFinalImageUrl] = useState<string | null>(null);
   const [history, setHistory] = useState<ProblemHistoryItem[]>([]);
+  const [stats, setStats] = useState<StatsMap>({});
 
   const [settings, setSettings] = useState<UserSettings>(() => ({ ...defaultSettings(), theme: initialTheme() }));
   const [legacyPlainKeys, setLegacyPlainKeys] = useState(false);
@@ -112,6 +114,7 @@ const AppInner: React.FC = () => {
       setAuthReady(true);
       if (!u) {
         setHistory([]);
+        setStats({});
         setSettings((s) => ({ ...defaultSettings(), theme: s.theme }));
         return;
       }
@@ -125,6 +128,7 @@ const AppInner: React.FC = () => {
       }
       try {
         setHistory(await fetchHistory(u.uid));
+        fetchStats(u.uid).then(setStats).catch((e) => console.error('학습 이력 불러오기 실패', e));
       } catch (e) {
         console.error(e);
         toast('학습 기록을 불러오지 못했습니다.', 'error');
@@ -212,6 +216,40 @@ const AppInner: React.FC = () => {
     }
   };
 
+  // ----- 채점·학습 이력 -----
+  const grade = (q: { question: string; answer: string }, answer: string) =>
+    gradeAnswer(q, answer, settings, admin).then(({ correct, feedback }) => ({ correct, feedback }));
+
+  const recordAttempt = (info: { problemId: string; index: number; question: string; tags: string[] }, correct: boolean, answer: string) => {
+    if (!user) return;
+    const key = statKey(info.problemId, info.index);
+    setStats((prev) => {
+      const next = applyAttempt(prev[key], info, correct, answer);
+      saveStat(user.uid, next).catch((e) => console.error('학습 이력 저장 실패', e));
+      return { ...prev, [key]: next };
+    });
+  };
+
+  const handleCardAttempt = (index: number, q: SimilarProblem, correct: boolean, answer: string) => {
+    const id = (state.data as Partial<ProblemHistoryItem> | null)?.id;
+    if (!id) return;
+    recordAttempt({ problemId: id, index, question: q.question, tags: state.data?.tags || [] }, correct, answer);
+  };
+
+  const handleQuizRecord = (q: QuizQuestion, correct: boolean, answer: string) =>
+    recordAttempt({ problemId: q.originalProblemId, index: q.index, question: q.question, tags: q.tags }, correct, answer);
+
+  const handleUpdateMeta = async (item: ProblemHistoryItem, meta: { subject: string; unit: string }) => {
+    try {
+      await updateProblemMeta(item.id, meta);
+      setHistory((h) => h.map((x) => (x.id === item.id ? { ...x, ...meta } : x)));
+      toast('과목·단원을 저장했습니다.', 'success');
+    } catch (e) {
+      console.error(e);
+      toast('저장하지 못했습니다. Firestore 규칙을 확인해 주세요.', 'error');
+    }
+  };
+
   const handleDelete = async (item: ProblemHistoryItem) => {
     try {
       await deleteHistory(item.id);
@@ -234,7 +272,7 @@ const AppInner: React.FC = () => {
   else if (!user) home = <WelcomeView onLogin={() => setShowLogin(true)} />;
   else if (state.isLoading) home = <UploadView onFileSelect={() => {}} isLoading statusMessage={statusMessage} />;
   else if (rawImageUrl) home = <ProblemSelector imageUrl={rawImageUrl} onConfirm={handleCropConfirm} onCancel={clearImages} />;
-  else if (state.data) home = <AnalysisView analysis={state.data} originalImageUrl={finalImageUrl} onReset={handleReset} onMore={user && activeProvider ? handleMoreSimilar : undefined} />;
+  else if (state.data) home = <AnalysisView analysis={state.data} originalImageUrl={finalImageUrl} onReset={handleReset} onMore={user && activeProvider ? handleMoreSimilar : undefined} onGrade={user ? grade : undefined} onAttempt={handleCardAttempt} stats={stats} />;
   else home = (
     <UploadView
       onFileSelect={handleFileSelect}
@@ -306,10 +344,10 @@ const AppInner: React.FC = () => {
         <Suspense fallback={<Spinner />}>
           {tab === 'HOME' && home}
           {tab === 'HISTORY' && (user
-            ? <HistoryView history={history} onDelete={handleDelete} onSelectProblem={(item) => { clearImages(); setState({ isLoading: false, data: item, error: null }); setTab('HOME'); }} />
+            ? <HistoryView history={history} onDelete={handleDelete} onUpdateMeta={handleUpdateMeta} onSelectProblem={(item) => { clearImages(); setState({ isLoading: false, data: item, error: null }); setTab('HOME'); }} />
             : <LoginRequired icon={History} title="학습 기록 보기" body="로그인하면 푼 문제가 저장되고 언제든 다시 볼 수 있어요." onLogin={() => setShowLogin(true)} />)}
           {tab === 'QUIZ' && (user
-            ? <QuizView uid={user.uid} history={history} settings={settings} admin={admin} onExit={() => setTab('HOME')} />
+            ? <QuizView uid={user.uid} history={history} stats={stats} onGrade={grade} onRecord={handleQuizRecord} onExit={() => setTab('HOME')} />
             : <LoginRequired icon={GraduationCap} title="나만의 시험 보기" body="분석한 문제의 유사 문제로 시험을 보고 자동 채점을 받아요." onLogin={() => setShowLogin(true)} />)}
         </Suspense>
       </main>

@@ -7,6 +7,7 @@ import { PROVIDERS, PROVIDER_ORDER, type ProviderId } from '../shared/ai/models'
 import { analysisSchema, buildAnalysisPrompt, buildGradePrompt, buildMoreSimilarPrompt, buildMoreSimilarUserText, gradeSchema, moreSimilarSchema } from '../shared/ai/schema';
 import { AIError, generateStructured, testApiKey, type FileInput, type StructuredRequest } from '../shared/ai/providers';
 import type { ProblemAnalysis, SimilarProblem, UserSettings } from '../types';
+import { answerChoice, getChoices } from './learning';
 
 export const ADMIN_EMAILS = ['reset98@gmail.com'];
 
@@ -204,6 +205,16 @@ export async function gradeAnswer(
   settings: UserSettings,
   admin: boolean,
 ): Promise<{ correct: boolean; feedback: string; byAI: boolean }> {
+  // 객관식: 보기 번호끼리 비교 (AI 호출 없음)
+  if (getChoices(q.question).length > 0) {
+    const right = answerChoice(q.answer);
+    const mine = answerChoice(studentAnswer);
+    if (right && mine) {
+      return right === mine
+        ? { correct: true, feedback: '정확해요! 잘했어요 👏', byAI: false }
+        : { correct: false, feedback: '정답이 아니에요. 힌트를 보고 보기를 다시 읽어 볼까요?', byAI: false };
+    }
+  }
   const a = normalizeAnswer(q.answer);
   const b = normalizeAnswer(studentAnswer);
   if (!b) return { correct: false, feedback: '답을 입력하지 않았어요.', byAI: false };

@@ -1,110 +1,110 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { GraduationCap, CheckCircle, XCircle, Trophy, Lightbulb, Loader2, RotateCcw, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react';
-import type { ProblemHistoryItem, QuizQuestion, QuizResult, UserSettings } from '../types';
-import { gradeAnswer, pickProvider } from '../services/aiClient';
+import { GraduationCap, CheckCircle, XCircle, Trophy, Lightbulb, RotateCcw, ChevronDown, ChevronUp, ArrowRight, Brain, Target, Sparkles, Shuffle, AlertTriangle } from 'lucide-react';
+import type { ProblemHistoryItem, QuizQuestion, QuizResult } from '../types';
 import { addQuizResult, fetchQuizResults } from '../services/userData';
+import { buildPool, groupStats, isDue, isMastered, reviewQueue, weakConcepts, type StatsMap } from '../services/learning';
+import AnswerBox, { type GradeResult } from './AnswerBox';
 import SafeSvg from './SafeSvg';
 
 interface Props {
   uid: string;
   history: ProblemHistoryItem[];
-  settings: UserSettings;
-  admin: boolean;
+  stats: StatsMap;
+  onGrade: (q: { question: string; answer: string }, answer: string) => Promise<GradeResult>;
+  onRecord: (q: QuizQuestion, correct: boolean, answer: string) => void;
   onExit: () => void;
 }
 
 type Phase = 'start' | 'question' | 'finished';
-
-function buildPool(history: ProblemHistoryItem[]): QuizQuestion[] {
-  const pool: QuizQuestion[] = [];
-  history.forEach((item) => {
-    (item.similarProblems || []).forEach((p, i) => {
-      if (!p?.question || !p?.answer) return;
-      pool.push({
-        id: `${item.id}-${i}`,
-        question: p.question,
-        answer: p.answer,
-        hint: p.hint || '',
-        svgCode: p.svgCode || '',
-        steps: p.steps || [],
-        sourceTitle: (item.tags || []).slice(0, 2).join(' · ') || item.dateString,
-        originalProblemId: item.id,
-      });
-    });
-  });
-  return pool;
-}
-
+const ALL = '전체';
 const shuffle = <T,>(arr: T[]) => [...arr].sort(() => Math.random() - 0.5);
 
-const QuizView: React.FC<Props> = ({ uid, history, settings, admin, onExit }) => {
+const Chip: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode }> = ({ active, onClick, children }) => (
+  <button
+    onClick={onClick}
+    className={`shrink-0 text-sm font-medium px-3.5 py-1.5 rounded-full border transition-colors ${active ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-blue-300'}`}
+  >
+    {children}
+  </button>
+);
+
+const Bar: React.FC<{ value: number | null }> = ({ value }) => (
+  <div className="h-2 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+    {value !== null && (
+      <div className={`h-full rounded-full ${value >= 80 ? 'bg-emerald-500' : value >= 50 ? 'bg-amber-400' : 'bg-rose-500'}`} style={{ width: `${Math.max(value, 4)}%` }} />
+    )}
+  </div>
+);
+
+const QuizView: React.FC<Props> = ({ uid, history, stats, onGrade, onRecord, onExit }) => {
   const pool = useMemo(() => buildPool(history), [history]);
-  const canAutoGrade = !!pickProvider(settings, admin);
+  const [subject, setSubject] = useState(ALL);
+  const [unit, setUnit] = useState(ALL);
 
   const [phase, setPhase] = useState<Phase>('start');
+  const [modeLabel, setModeLabel] = useState('');
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [index, setIndex] = useState(0);
-  const [input, setInput] = useState('');
-  const [grading, setGrading] = useState(false);
   const [checked, setChecked] = useState(false);
-  const [needSelfGrade, setNeedSelfGrade] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [showSteps, setShowSteps] = useState(false);
   const [results, setResults] = useState<QuizResult[]>([]);
   const [isRetry, setIsRetry] = useState(false);
 
-  useEffect(() => {
-    fetchQuizResults(uid).then(setResults).catch(() => setResults([]));
-  }, [uid]);
+  useEffect(() => { fetchQuizResults(uid).then(setResults).catch(() => setResults([])); }, [uid]);
 
-  const start = (qs: QuizQuestion[], retry = false) => {
+  // ----- 범위(과목·단원) -----
+  const subjects = useMemo(() => groupStats(pool, stats, 'subject'), [pool, stats]);
+  const inSubject = useMemo(() => (subject === ALL ? pool : pool.filter((q) => q.subject === subject)), [pool, subject]);
+  const units = useMemo(() => (subject === ALL ? [] : groupStats(inSubject, stats, 'unit')), [inSubject, subject, stats]);
+  const scope = useMemo(() => (unit === ALL ? inSubject : inSubject.filter((q) => q.unit === unit)), [inSubject, unit]);
+
+  // ----- 범위 안의 학습 상태 -----
+  const tried = scope.filter((q) => stats[q.id]);
+  const attempts = tried.reduce((n, q) => n + stats[q.id].attempts, 0);
+  const wrongs = tried.reduce((n, q) => n + stats[q.id].wrong, 0);
+  const accuracy = attempts ? Math.round(((attempts - wrongs) / attempts) * 100) : null;
+  const due = useMemo(() => reviewQueue(scope, stats), [scope, stats]);
+  const fresh = scope.filter((q) => !stats[q.id]);
+  const mastered = scope.filter((q) => isMastered(stats[q.id])).length;
+  const weak = useMemo(() => weakConcepts(stats, new Set(scope.map((q) => q.originalProblemId))), [stats, scope]);
+  const frequentWrong = useMemo(
+    () => tried.filter((q) => stats[q.id].wrong > 0 && !isMastered(stats[q.id])).sort((a, b) => stats[b.id].wrong - stats[a.id].wrong).slice(0, 5),
+    [tried, stats],
+  );
+
+  const start = (qs: QuizQuestion[], label: string, retry = false) => {
+    if (qs.length === 0) return;
     setQuestions(qs.map((q) => ({ ...q, userAnswer: undefined, isCorrect: undefined, feedback: undefined })));
-    setIndex(0);
-    setIsRetry(retry);
-    resetQuestion();
+    setIndex(0); setIsRetry(retry); setModeLabel(label);
+    setChecked(false); setShowHint(false); setShowSteps(false);
     setPhase('question');
   };
 
-  const resetQuestion = () => {
-    setInput(''); setChecked(false); setNeedSelfGrade(false); setShowHint(false); setShowSteps(false);
+  const startWeak = () => {
+    const tag = weak[0]?.tag;
+    if (!tag) return;
+    const qs = scope.filter((q) => q.tags.includes(tag) && !isMastered(stats[q.id]));
+    // 틀린 적 있는 문제 먼저, 그다음 아직 안 푼 문제
+    const sorted = [...qs].sort((a, b) => (stats[b.id]?.wrong || 0) - (stats[a.id]?.wrong || 0));
+    start(sorted.slice(0, 10), `약한 개념 · #${tag}`);
   };
 
-  const update = (patch: Partial<QuizQuestion>) => {
-    setQuestions((list) => list.map((q, i) => (i === index ? { ...q, ...patch } : q)));
-  };
-
-  const submit = async () => {
+  const handleResult = (r: GradeResult, answer: string) => {
     const q = questions[index];
-    setGrading(true);
-    try {
-      const r = await gradeAnswer(q, input, settings, admin);
-      update({ userAnswer: input, isCorrect: r.correct, feedback: r.feedback });
-      setChecked(true);
-    } catch {
-      // 키가 없거나 AI 오류 → 스스로 채점
-      update({ userAnswer: input });
-      setNeedSelfGrade(true);
-      setChecked(true);
-    } finally {
-      setGrading(false);
-    }
+    setQuestions((list) => list.map((x, i) => (i === index ? { ...x, userAnswer: answer, isCorrect: r.correct, feedback: r.feedback } : x)));
+    onRecord(q, r.correct, answer);
+    setChecked(true);
   };
 
-  const selfGrade = (correct: boolean) => {
-    update({ isCorrect: correct, feedback: correct ? '스스로 맞았다고 표시했어요.' : '다음에 다시 풀어 봐요.' });
-    setNeedSelfGrade(false);
-  };
-
-  const next = async () => {
+  const next = () => {
     if (index < questions.length - 1) {
-      setIndex(index + 1);
-      resetQuestion();
+      setIndex(index + 1); setChecked(false); setShowHint(false); setShowSteps(false);
       return;
     }
     setPhase('finished');
-    const correct = questions.filter((q) => q.isCorrect).length;
     if (!isRetry) {
-      const r: QuizResult = { timestamp: Date.now(), total: questions.length, correct };
+      const r: QuizResult = { timestamp: Date.now(), total: questions.length, correct: questions.filter((q) => q.isCorrect).length };
       setResults((list) => [r, ...list].slice(0, 10));
       addQuizResult(uid, r).catch(() => {});
     }
@@ -117,38 +117,135 @@ const QuizView: React.FC<Props> = ({ uid, history, settings, admin, onExit }) =>
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-8 animate-fade-in">
         <GraduationCap size={48} className="text-slate-300 dark:text-slate-600 mb-4" />
         <h3 className="text-xl font-bold text-slate-800 dark:text-white">아직 시험 문제가 없어요</h3>
-        <p className="text-slate-500 dark:text-slate-400 mt-2">문제를 하나 분석하면 AI가 만든 유사 문제 3개가 시험 문제로 쌓여요.</p>
+        <p className="text-slate-500 dark:text-slate-400 mt-2">문제를 하나 분석하면 AI가 만든 유사 문제가 여기에 쌓여요.</p>
         <button onClick={onExit} className="mt-6 px-6 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700">문제 분석하러 가기</button>
       </div>
     );
   }
 
   if (phase === 'start') {
-    const sizes = [5, 10].filter((n, i) => i === 0 || pool.length > 5);
+    const modes = [
+      { icon: Brain, title: '맞춤 복습', desc: due.length ? `복습할 때가 된 문제 ${due.length}개 (틀린 문제 우선)` : '지금 복습할 문제가 없어요', count: due.length, onClick: () => start(due.slice(0, 10), '맞춤 복습'), color: 'text-blue-600 bg-blue-50 dark:bg-blue-900/30' },
+      { icon: Target, title: '약한 개념 집중', desc: weak[0] ? `#${weak[0].tag} 정답률 ${weak[0].accuracy}%` : '틀린 개념이 아직 없어요', count: weak[0] ? 1 : 0, onClick: startWeak, color: 'text-rose-600 bg-rose-50 dark:bg-rose-900/30' },
+      { icon: Sparkles, title: '새 문제 풀기', desc: fresh.length ? `아직 안 푼 문제 ${fresh.length}개` : '모두 한 번씩 풀었어요', count: fresh.length, onClick: () => start(shuffle(fresh).slice(0, 10), '새 문제'), color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30' },
+      { icon: Shuffle, title: '무작위 시험', desc: `범위 안 ${scope.length}문제 중 10개`, count: scope.length, onClick: () => start(shuffle(scope).slice(0, 10), '무작위 시험'), color: 'text-purple-600 bg-purple-50 dark:bg-purple-900/30' },
+    ];
+    const groups = subject === ALL ? subjects : units;
+
     return (
-      <div className="max-w-xl mx-auto mt-6 space-y-6 animate-fade-in">
-        <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 border border-slate-200 dark:border-slate-700 text-center shadow-sm">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center mb-4">
-            <GraduationCap size={32} className="text-blue-600 dark:text-blue-400" />
-          </div>
-          <h2 className="text-2xl font-bold text-slate-800 dark:text-white">나만의 시험</h2>
-          <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm">
-            지금까지 분석한 문제로 만든 <b className="text-blue-600">유사 문제 {pool.length}개</b> 중에서 무작위로 출제해요.
-          </p>
-          <p className="text-xs mt-2 text-slate-400">
-            {canAutoGrade ? '답을 입력하면 AI가 자동으로 채점해요.' : 'AI 키가 없어서 정답을 보고 스스로 채점해요.'}
-          </p>
-          <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
-            {sizes.map((n) => (
-              <button key={n} onClick={() => start(shuffle(pool).slice(0, n))} className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 dark:shadow-none">
-                {Math.min(n, pool.length)}문제 시작
-              </button>
+      <div className="max-w-3xl mx-auto space-y-5 animate-fade-in">
+        <h2 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2"><GraduationCap className="text-blue-500" /> 학습 센터</h2>
+
+        {/* 범위 선택 */}
+        <div className="space-y-2">
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            <Chip active={subject === ALL} onClick={() => { setSubject(ALL); setUnit(ALL); }}>전체 과목</Chip>
+            {subjects.map((g) => (
+              <Chip key={g.name} active={subject === g.name} onClick={() => { setSubject(g.name); setUnit(ALL); }}>{g.name} <span className="opacity-60">{g.problems}</span></Chip>
             ))}
           </div>
+          {subject !== ALL && units.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto pb-1 pl-3 border-l-2 border-blue-200 dark:border-blue-800">
+              <Chip active={unit === ALL} onClick={() => setUnit(ALL)}>모든 단원</Chip>
+              {units.map((g) => <Chip key={g.name} active={unit === g.name} onClick={() => setUnit(g.name)}>{g.name}</Chip>)}
+            </div>
+          )}
         </div>
+
+        {/* 요약 */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            ['정답률', accuracy === null ? '-' : `${accuracy}%`],
+            ['푼 문제', `${tried.length} / ${scope.length}`],
+            ['복습할 문제', `${due.length}`],
+            ['졸업', `${mastered}`],
+          ].map(([k, v]) => (
+            <div key={k} className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-slate-200 dark:border-slate-700">
+              <p className="text-xs text-slate-500 dark:text-slate-400">{k}</p>
+              <p className="text-2xl font-extrabold text-slate-800 dark:text-white mt-1">{v}</p>
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-slate-400 -mt-2">틀린 문제는 바로, 맞힌 문제는 1일·3일·7일 뒤에 다시 나와요. 3번 연속 맞히면 졸업!</p>
+
+        {/* 풀기 방법 */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {modes.map(({ icon: I, title, desc, count, onClick, color }) => (
+            <button
+              key={title}
+              onClick={onClick}
+              disabled={!count}
+              className="text-left bg-white dark:bg-slate-800 rounded-2xl p-4 border border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:shadow-md transition-all disabled:opacity-50 disabled:hover:border-slate-200 disabled:hover:shadow-none flex items-center gap-3"
+            >
+              <span className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${color}`}><I size={22} /></span>
+              <span className="flex-1 min-w-0">
+                <span className="block font-bold text-slate-800 dark:text-white">{title}</span>
+                <span className="block text-xs text-slate-500 dark:text-slate-400 truncate">{desc}</span>
+              </span>
+              {!!count && <ArrowRight size={18} className="text-slate-300" />}
+            </button>
+          ))}
+        </div>
+
+        {/* 과목·단원별 정답률 */}
+        {groups.some((g) => g.attempts > 0) && (
+          <section className="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-slate-200 dark:border-slate-700">
+            <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-3 text-sm">{subject === ALL ? '과목별 정답률' : `${subject} 단원별 정답률`}</h3>
+            <ul className="space-y-3">
+              {groups.map((g) => (
+                <li key={g.name}>
+                  <button
+                    onClick={() => (subject === ALL ? (setSubject(g.name), setUnit(ALL)) : setUnit(g.name))}
+                    className="w-full text-left"
+                  >
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-slate-700 dark:text-slate-200 truncate">{g.name}</span>
+                      <span className="text-slate-500 shrink-0 ml-2">
+                        {g.accuracy === null ? '아직 안 풂' : `${g.accuracy}%`}
+                        {g.due > 0 && <span className="ml-2 text-blue-600 font-medium">복습 {g.due}</span>}
+                      </span>
+                    </div>
+                    <Bar value={g.accuracy} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {/* 약한 개념 */}
+        {weak.length > 0 && (
+          <section className="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-slate-200 dark:border-slate-700">
+            <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-3 text-sm flex items-center gap-1.5"><AlertTriangle size={15} className="text-amber-500" /> 자주 틀리는 개념</h3>
+            <div className="flex flex-wrap gap-2">
+              {weak.slice(0, 8).map((c) => (
+                <span key={c.tag} className="text-xs px-2.5 py-1 rounded-full bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400">#{c.tag} · {c.accuracy}%</span>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* 자주 틀리는 문제 */}
+        {frequentWrong.length > 0 && (
+          <section className="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm">자주 틀리는 문제</h3>
+              <button onClick={() => start(frequentWrong, '자주 틀리는 문제')} className="text-xs font-bold text-blue-600 hover:underline">이 문제들 다시 풀기</button>
+            </div>
+            <ul className="space-y-2">
+              {frequentWrong.map((q) => (
+                <li key={q.id} className="flex items-center gap-3 text-sm">
+                  <span className="shrink-0 text-xs font-bold text-rose-500 w-14">{stats[q.id].wrong}번 틀림</span>
+                  <span className="truncate text-slate-600 dark:text-slate-300">{q.question}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         {results.length > 0 && (
-          <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-slate-200 dark:border-slate-700">
-            <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-3 text-sm">최근 시험 기록</h3>
+          <section className="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-slate-200 dark:border-slate-700">
+            <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-3 text-sm">최근 시험 점수</h3>
             <ul className="space-y-2">
               {results.slice(0, 5).map((r, i) => (
                 <li key={r.id || i} className="flex items-center justify-between text-sm">
@@ -157,7 +254,7 @@ const QuizView: React.FC<Props> = ({ uid, history, settings, admin, onExit }) =>
                 </li>
               ))}
             </ul>
-          </div>
+          </section>
         )}
       </div>
     );
@@ -167,11 +264,12 @@ const QuizView: React.FC<Props> = ({ uid, history, settings, admin, onExit }) =>
     const correct = questions.filter((q) => q.isCorrect).length;
     const wrong = questions.filter((q) => !q.isCorrect);
     return (
-      <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 border border-slate-200 dark:border-slate-700 text-center animate-fade-in max-w-lg mx-auto mt-6 shadow-lg">
+      <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 border border-slate-200 dark:border-slate-700 text-center animate-fade-in max-w-lg mx-auto mt-4 shadow-lg">
         <div className="w-20 h-20 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mx-auto mb-5">
           <Trophy size={40} className="text-yellow-600 dark:text-yellow-500" />
         </div>
-        <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-1">{isRetry ? '오답 다시 풀기 끝!' : '시험 끝!'}</h2>
+        <p className="text-sm text-slate-400">{modeLabel}</p>
+        <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-1">{isRetry ? '오답 다시 풀기 끝!' : '끝까지 풀었어요!'}</h2>
         <div className="text-5xl font-black text-blue-600 dark:text-blue-400 my-4">{Math.round((correct / questions.length) * 100)}점</div>
         <p className="text-sm text-slate-400 mb-6">{questions.length}문제 중 {correct}문제 정답</p>
         <ul className="space-y-2 mb-8 text-left">
@@ -185,21 +283,22 @@ const QuizView: React.FC<Props> = ({ uid, history, settings, admin, onExit }) =>
         </ul>
         <div className="flex flex-col gap-3">
           {wrong.length > 0 && (
-            <button onClick={() => start(wrong, true)} className="w-full py-3 bg-rose-500 text-white rounded-xl font-bold hover:bg-rose-600 flex items-center justify-center gap-2">
-              <RotateCcw size={18} /> 틀린 {wrong.length}문제 다시 풀기
+            <button onClick={() => start(wrong, '오답 다시 풀기', true)} className="w-full py-3 bg-rose-500 text-white rounded-xl font-bold hover:bg-rose-600 flex items-center justify-center gap-2">
+              <RotateCcw size={18} /> 틀린 {wrong.length}문제 바로 다시 풀기
             </button>
           )}
-          <button onClick={() => setPhase('start')} className="w-full py-3 bg-slate-800 dark:bg-slate-600 text-white rounded-xl font-bold hover:bg-slate-700">처음으로</button>
+          <button onClick={() => setPhase('start')} className="w-full py-3 bg-slate-800 dark:bg-slate-600 text-white rounded-xl font-bold hover:bg-slate-700">학습 센터로</button>
         </div>
       </div>
     );
   }
 
   const q = questions[index];
+  const st = stats[q.id];
   return (
-    <div className="max-w-2xl mx-auto mt-4 animate-fade-in">
+    <div className="max-w-2xl mx-auto mt-2 animate-fade-in">
       <div className="flex justify-between items-center mb-3">
-        <span className="text-sm font-bold text-slate-500 dark:text-slate-400">{isRetry && '오답 · '}문제 {index + 1} / {questions.length}</span>
+        <span className="text-sm font-bold text-slate-500 dark:text-slate-400">{modeLabel} · {index + 1} / {questions.length}</span>
         <button onClick={() => setPhase('start')} className="text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">그만하기</button>
       </div>
       <div className="w-full h-2 bg-slate-100 dark:bg-slate-700 rounded-full mb-6">
@@ -207,59 +306,29 @@ const QuizView: React.FC<Props> = ({ uid, history, settings, admin, onExit }) =>
       </div>
 
       <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200 dark:border-slate-700">
-        <span className="inline-block px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-bold rounded-full mb-4">{q.sourceTitle}</span>
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <span className="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-bold rounded-full">{q.subject} · {q.unit}</span>
+          {st && !st.lastCorrect && <span className="px-2 py-1 bg-rose-50 dark:bg-rose-900/20 text-rose-500 text-xs font-bold rounded-full">지난번에 틀린 문제</span>}
+          {st && isDue(st) && st.lastCorrect && <span className="px-2 py-1 bg-amber-50 dark:bg-amber-900/20 text-amber-600 text-xs font-bold rounded-full">복습할 때가 됐어요</span>}
+        </div>
         {q.svgCode && (
-          <div className="w-full max-w-[260px] aspect-square mx-auto mb-4 bg-slate-50 dark:bg-slate-100 rounded-xl p-2 border border-slate-100">
+          <div className="w-full max-w-[260px] aspect-square mx-auto mb-4 bg-white rounded-xl p-2 border border-slate-200">
             <SafeSvg svg={q.svgCode} />
           </div>
         )}
         <h3 className="text-lg sm:text-xl font-bold text-slate-800 dark:text-white leading-relaxed mb-6 whitespace-pre-wrap">{q.question}</h3>
 
-        {!checked ? (
-          <form onSubmit={(e) => { e.preventDefault(); if (input.trim()) submit(); }} className="space-y-3">
-            <input
-              type="text"
-              autoFocus
-              placeholder="정답을 입력하세요"
-              className="w-full p-4 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:border-blue-400 dark:text-white text-lg"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              disabled={grading}
-            />
-            {q.hint && (
-              showHint ? (
-                <p className="text-sm text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg p-3"><b>힌트</b> {q.hint}</p>
-              ) : (
-                <button type="button" onClick={() => setShowHint(true)} className="text-sm text-slate-500 hover:text-emerald-600 flex items-center gap-1"><Lightbulb size={14} /> 힌트 보기</button>
-              )
-            )}
-            <button type="submit" disabled={!input.trim() || grading} className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2">
-              {grading ? <><Loader2 size={18} className="animate-spin" /> 채점 중...</> : '제출하기'}
-            </button>
-          </form>
-        ) : (
-          <div className="animate-fade-in space-y-4">
-            {needSelfGrade ? (
-              <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-5 border border-slate-100 dark:border-slate-700 text-center">
-                <p className="text-sm text-slate-500 mb-1">정답</p>
-                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-1">{q.answer}</p>
-                <p className="text-sm text-slate-500 mb-4">내 답: {q.userAnswer}</p>
-                <p className="text-slate-700 dark:text-slate-300 font-medium mb-3">맞았나요?</p>
-                <div className="flex gap-3">
-                  <button onClick={() => selfGrade(false)} className="flex-1 py-3 border-2 border-rose-200 text-rose-500 rounded-xl font-bold hover:bg-rose-50 dark:hover:bg-rose-900/20 flex items-center justify-center gap-2"><XCircle size={18} /> 틀렸어요</button>
-                  <button onClick={() => selfGrade(true)} className="flex-1 py-3 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 flex items-center justify-center gap-2"><CheckCircle size={18} /> 맞았어요</button>
-                </div>
-              </div>
-            ) : (
-              <div className={`rounded-xl p-5 border ${q.isCorrect ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800' : 'bg-rose-50 border-rose-200 dark:bg-rose-900/20 dark:border-rose-800'}`}>
-                <p className={`font-bold text-lg flex items-center gap-2 ${q.isCorrect ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                  {q.isCorrect ? <><CheckCircle size={20} /> 정답이에요!</> : <><XCircle size={20} /> 아쉬워요</>}
-                </p>
-                {q.feedback && <p className="text-sm text-slate-700 dark:text-slate-300 mt-2">{q.feedback}</p>}
-                <p className="text-sm text-slate-600 dark:text-slate-300 mt-3">내 답 <b>{q.userAnswer}</b> · 정답 <b>{q.answer}</b></p>
-              </div>
-            )}
+        <AnswerBox key={q.id + index} question={q.question} answer={q.answer} onGrade={(a) => onGrade(q, a)} onResult={handleResult} allowRetry={false} size="lg" autoFocus />
 
+        {!checked && q.hint && (
+          showHint
+            ? <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg p-3"><b>힌트</b> {q.hint}</p>
+            : <button onClick={() => setShowHint(true)} className="mt-3 text-sm text-slate-500 hover:text-emerald-600 flex items-center gap-1"><Lightbulb size={14} /> 힌트 보기</button>
+        )}
+
+        {checked && (
+          <div className="mt-4 space-y-4 animate-fade-in">
+            <p className="text-sm text-slate-600 dark:text-slate-300">정답 <b className="text-blue-600 dark:text-blue-400">{q.answer}</b></p>
             {q.steps.length > 0 && (
               <div className="border border-slate-200 dark:border-slate-700 rounded-xl">
                 <button onClick={() => setShowSteps(!showSteps)} className="w-full flex items-center justify-between p-3 text-sm font-bold text-slate-600 dark:text-slate-300">
@@ -278,12 +347,9 @@ const QuizView: React.FC<Props> = ({ uid, history, settings, admin, onExit }) =>
                 )}
               </div>
             )}
-
-            {!needSelfGrade && (
-              <button onClick={next} className="w-full py-4 bg-slate-800 dark:bg-slate-600 text-white rounded-xl font-bold hover:bg-slate-700 flex items-center justify-center gap-2">
-                {index < questions.length - 1 ? <>다음 문제 <ArrowRight size={18} /></> : '결과 보기'}
-              </button>
-            )}
+            <button onClick={next} className="w-full py-4 bg-slate-800 dark:bg-slate-600 text-white rounded-xl font-bold hover:bg-slate-700 flex items-center justify-center gap-2">
+              {index < questions.length - 1 ? <>다음 문제 <ArrowRight size={18} /></> : '결과 보기'}
+            </button>
           </div>
         )}
       </div>

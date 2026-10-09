@@ -32,8 +32,14 @@ export interface SimilarProblem {
   steps: SolutionStep[];
 }
 
+export const SUBJECTS = ['수학', '과학', '사회', '국어', '영어', '기타'] as const;
+
 export interface ProblemAnalysis {
   ocrText: string;
+  /** 과목 (예전 기록에는 없음 → 미분류) */
+  subject?: string;
+  /** 단원 (예: 4학년 1학기 2. 각도) */
+  unit?: string;
   tags: string[];
   difficulty: string;
   goal: string;
@@ -69,6 +75,10 @@ export interface QuizQuestion {
   steps: SolutionStep[];
   sourceTitle: string;
   originalProblemId: string;
+  index: number;
+  tags: string[];
+  subject: string;
+  unit: string;
   userAnswer?: string;
   isCorrect?: boolean;
   feedback?: string;

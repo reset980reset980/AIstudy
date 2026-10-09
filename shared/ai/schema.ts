@@ -66,6 +66,8 @@ export const analysisSchema = {
   type: 'object',
   properties: {
     ocrText: str('이미지에서 읽어 낸 문제 원문'),
+    subject: { type: 'string', enum: ['수학', '과학', '사회', '국어', '영어', '기타'] },
+    unit: str('교과서 단원명. 예: "4학년 1학기 2. 각도". 학년·학기를 모르면 단원 이름만 짧게'),
     tags: { type: 'array', items: { type: 'string' }, description: '관련 개념 태그 2~4개' },
     difficulty: { type: 'string', enum: ['하', '중', '상'] },
     goal: str('문제가 요구하는 것'),
@@ -78,7 +80,7 @@ export const analysisSchema = {
       items: similarItemSchema,
     },
   },
-  required: ['ocrText', 'tags', 'difficulty', 'goal', 'requiredKnowledge', 'steps', 'finalAnswer', 'similarProblems'],
+  required: ['ocrText', 'subject', 'unit', 'tags', 'difficulty', 'goal', 'requiredKnowledge', 'steps', 'finalAnswer', 'similarProblems'],
   additionalProperties: false,
 };
 
@@ -100,6 +102,7 @@ ${level}
 
 1. 원문 읽기(ocrText): 이미지의 문제를 정확히 옮겨 적으세요. 수식은 읽기 쉬운 일반 텍스트로(예: x^2, 3/4).
 2. 분석: 목표(goal), 필요한 지식, 난이도(하/중/상), 개념 태그를 정하세요.
+   - 과목(subject)과 한국 초·중·고 교육과정 기준 단원(unit)을 정하세요. 같은 단원은 항상 같은 이름으로 쓰세요(예: "4학년 1학기 2. 각도").
 3. 단계별 풀이(steps): 논리적인 단계로 나누고 각 단계에 설명·식·쉬운 팁·개념을 쓰세요.
    - 계산은 반드시 검산하세요. 정답이 틀리면 안 됩니다.
    - 도형·위치 관계가 핵심일 때만 visualData.type=GEOMETRY로 SVG를 그리고, 수량 비교가 핵심일 때만 BAR를 쓰세요. 그 밖에는 NONE.

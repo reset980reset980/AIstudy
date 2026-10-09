@@ -78,3 +78,7 @@ export function providerLabel(p: ProviderId | undefined): string {
 export async function updateSimilarProblems(id: string, similarProblems: SimilarProblem[]): Promise<void> {
   await updateDoc(doc(db, 'problems', id), { similarProblems: clean(similarProblems) });
 }
+
+export async function updateProblemMeta(id: string, meta: { subject: string; unit: string }): Promise<void> {
+  await updateDoc(doc(db, 'problems', id), { subject: meta.subject, unit: meta.unit.trim() });
+}

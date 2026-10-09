@@ -4,6 +4,8 @@ import { ProblemAnalysis, SimilarProblem } from '../types';
 import StepVisual from './StepVisual';
 import SafeSvg from './SafeSvg';
 import { PROVIDERS } from '../shared/ai/models';
+import AnswerBox, { type GradeResult } from './AnswerBox';
+import { isMastered, statKey, type StatsMap } from '../services/learning';
 import { CheckCircle, BookOpen, Lightbulb, ArrowRight, RefreshCw, Triangle, X, MonitorPlay, Maximize2 } from 'lucide-react';
 
 interface AnalysisViewProps {
@@ -12,9 +14,15 @@ interface AnalysisViewProps {
   onReset: () => void;
   /** 같은 개념의 새 유사 문제 3개 더 만들기 */
   onMore?: () => Promise<void>;
+  /** 카드에서 바로 푼 답 채점 */
+  onGrade?: (q: SimilarProblem, answer: string) => Promise<GradeResult>;
+  /** 채점 결과를 학습 이력에 기록 */
+  onAttempt?: (index: number, q: SimilarProblem, correct: boolean, answer: string) => void;
+  stats?: StatsMap;
 }
 
-const AnalysisView: React.FC<AnalysisViewProps> = ({ analysis, originalImageUrl, onReset, onMore }) => {
+const AnalysisView: React.FC<AnalysisViewProps> = ({ analysis, originalImageUrl, onReset, onMore, onGrade, onAttempt, stats }) => {
+  const problemId = (analysis as { id?: string }).id;
   const [selectedSimilarProblem, setSelectedSimilarProblem] = useState<SimilarProblem | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const handleMore = async () => {
@@ -34,6 +42,11 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ analysis, originalImageUrl,
             <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2 flex items-center gap-2">
               <span className="text-2xl">🧭</span> 문제 해결 지도
             </h2>
+            {(analysis.subject || analysis.unit) && (
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">
+                <span className="font-bold text-blue-600 dark:text-blue-400">{analysis.subject}</span>{analysis.unit ? ` · ${analysis.unit}` : ''}
+              </p>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
               <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-900">
                 <h3 className="text-blue-700 dark:text-blue-400 font-semibold text-sm mb-2 flex items-center gap-2">
@@ -197,6 +210,24 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ analysis, originalImageUrl,
                     </p>
 
                     <div className="mt-auto space-y-3">
+                        {onGrade && (() => {
+                          const st = problemId && stats ? stats[statKey(problemId, idx)] : undefined;
+                          return (
+                            <>
+                              {st && (
+                                <p className="text-[11px] text-slate-400">
+                                  {isMastered(st) ? '🎓 졸업한 문제' : `지난 기록: ${st.attempts}번 풀어 ${st.wrong}번 틀림 · 최근 ${st.lastCorrect ? '정답' : '오답'}`}
+                                </p>
+                              )}
+                              <AnswerBox
+                                question={prob.question}
+                                answer={prob.answer}
+                                onGrade={(a) => onGrade(prob, a)}
+                                onResult={(r, a) => onAttempt?.(idx, prob, r.correct, a)}
+                              />
+                            </>
+                          );
+                        })()}
                         <div className="bg-green-50 dark:bg-green-900/10 p-3 rounded-lg border border-green-100 dark:border-green-900/30">
                             <p className="text-green-700 dark:text-green-400 text-xs">
                                 <span className="font-bold mr-1">힌트:</span> {prob.hint}
