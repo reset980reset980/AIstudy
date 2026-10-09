@@ -123,7 +123,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ analysis, originalImageUrl,
                         {/* Math Principle */}
                         <div className="bg-indigo-50 dark:bg-indigo-900/10 rounded-lg p-3 border border-indigo-100 dark:border-indigo-900/30">
                             <h5 className="text-indigo-700 dark:text-indigo-400 text-xs font-bold flex items-center gap-1 mb-1">
-                                <span className="text-sm"><Triangle size={12} className="fill-indigo-700 dark:fill-indigo-400" /></span> 수학 원리
+                                <span className="text-sm"><Triangle size={12} className="fill-indigo-700 dark:fill-indigo-400" /></span> 핵심 개념
                             </h5>
                             <p className="text-slate-700 dark:text-slate-300 text-sm">
                                 {step.mathPrinciple}
@@ -285,7 +285,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ analysis, originalImageUrl,
                                             <p className="text-slate-700 dark:text-slate-300 text-sm">{step.tip}</p>
                                         </div>
                                         <div className="bg-indigo-50 dark:bg-indigo-900/10 rounded-lg p-3 border border-indigo-100 dark:border-indigo-900/30">
-                                            <p className="text-indigo-800 dark:text-indigo-400 text-xs font-bold mb-1">📐 수학 원리</p>
+                                            <p className="text-indigo-800 dark:text-indigo-400 text-xs font-bold mb-1">📐 핵심 개념</p>
                                             <p className="text-slate-700 dark:text-slate-300 text-sm">{step.mathPrinciple}</p>
                                         </div>
                                     </div>
